@@ -2,9 +2,11 @@ import pygame
 import sys
 import random
 import math
+import os
 
 # Initialize Pygame
 pygame.init()
+pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=512)
 
 # Constants
 SCREEN_WIDTH = 1024
@@ -33,6 +35,214 @@ GRAVITY = 0.8
 PUNCH_RANGE = 45
 KICK_RANGE = 55
 
+# Sound and Music Manager
+class SoundManager:
+    def __init__(self):
+        self.sounds = {}
+        self.music_playing = False
+        self.sound_enabled = True
+        self.music_enabled = True
+        
+        # Create sound directory if it doesn't exist
+        if not os.path.exists('sounds'):
+            os.makedirs('sounds')
+            
+        # Generate procedural sounds
+        self.generate_sounds()
+        
+    def generate_sounds(self):
+        """Generate simple procedural sounds using pygame"""
+        try:
+            # Punch sound - short sharp tone
+            punch_sound = pygame.sndarray.make_sound(
+                self.generate_tone(440, 0.1, 'square')
+            )
+            self.sounds['punch'] = punch_sound
+            
+            # Kick sound - deeper, longer tone
+            kick_sound = pygame.sndarray.make_sound(
+                self.generate_tone(220, 0.15, 'square')
+            )
+            self.sounds['kick'] = kick_sound
+            
+            # Jump sound - rising tone
+            jump_sound = pygame.sndarray.make_sound(
+                self.generate_sweep(200, 400, 0.2)
+            )
+            self.sounds['jump'] = jump_sound
+            
+            # Diamond collect - pleasant chime
+            diamond_sound = pygame.sndarray.make_sound(
+                self.generate_tone(800, 0.3, 'sine')
+            )
+            self.sounds['diamond_collect'] = diamond_sound
+            
+            # Diamond lost - descending tone
+            diamond_lost_sound = pygame.sndarray.make_sound(
+                self.generate_sweep(400, 200, 0.4)
+            )
+            self.sounds['diamond_lost'] = diamond_lost_sound
+            
+            # Life lost - dramatic descending sequence
+            life_lost_sound = pygame.sndarray.make_sound(
+                self.generate_life_lost_sound()
+            )
+            self.sounds['life_lost'] = life_lost_sound
+            
+            # Robot hit - metallic clang
+            robot_hit_sound = pygame.sndarray.make_sound(
+                self.generate_noise(0.1)
+            )
+            self.sounds['robot_hit'] = robot_hit_sound
+            
+            # Boss hit - deeper metallic sound
+            boss_hit_sound = pygame.sndarray.make_sound(
+                self.generate_tone(150, 0.2, 'square')
+            )
+            self.sounds['boss_hit'] = boss_hit_sound
+            
+            # Level complete - victory fanfare
+            level_complete_sound = pygame.sndarray.make_sound(
+                self.generate_victory_sound()
+            )
+            self.sounds['level_complete'] = level_complete_sound
+            
+        except Exception as e:
+            print(f"Warning: Could not generate sounds: {e}")
+            self.sound_enabled = False
+    
+    def generate_tone(self, frequency, duration, wave_type='sine'):
+        """Generate a simple tone"""
+        import numpy as np
+        sample_rate = 22050
+        frames = int(duration * sample_rate)
+        arr = np.zeros((frames, 2))
+        
+        for i in range(frames):
+            time = float(i) / sample_rate
+            if wave_type == 'sine':
+                wave = np.sin(2 * np.pi * frequency * time)
+            elif wave_type == 'square':
+                wave = 1 if np.sin(2 * np.pi * frequency * time) > 0 else -1
+            else:
+                wave = np.sin(2 * np.pi * frequency * time)
+            
+            # Apply envelope to avoid clicks
+            envelope = min(1.0, min(time * 10, (duration - time) * 10))
+            arr[i] = [wave * envelope * 0.3, wave * envelope * 0.3]
+        
+        return (arr * 32767).astype(np.int16)
+    
+    def generate_sweep(self, start_freq, end_freq, duration):
+        """Generate a frequency sweep"""
+        import numpy as np
+        sample_rate = 22050
+        frames = int(duration * sample_rate)
+        arr = np.zeros((frames, 2))
+        
+        for i in range(frames):
+            time = float(i) / sample_rate
+            progress = time / duration
+            frequency = start_freq + (end_freq - start_freq) * progress
+            wave = np.sin(2 * np.pi * frequency * time)
+            
+            # Apply envelope
+            envelope = min(1.0, min(time * 5, (duration - time) * 5))
+            arr[i] = [wave * envelope * 0.3, wave * envelope * 0.3]
+        
+        return (arr * 32767).astype(np.int16)
+    
+    def generate_noise(self, duration):
+        """Generate noise for metallic sounds"""
+        import numpy as np
+        sample_rate = 22050
+        frames = int(duration * sample_rate)
+        arr = np.random.random((frames, 2)) * 2 - 1
+        
+        # Apply envelope
+        for i in range(frames):
+            time = float(i) / sample_rate
+            envelope = max(0, 1 - time / duration)
+            arr[i] *= envelope * 0.2
+        
+        return (arr * 32767).astype(np.int16)
+    
+    def generate_life_lost_sound(self):
+        """Generate dramatic life lost sound"""
+        import numpy as np
+        sample_rate = 22050
+        duration = 1.0
+        frames = int(duration * sample_rate)
+        arr = np.zeros((frames, 2))
+        
+        # Descending sequence of tones
+        frequencies = [400, 350, 300, 250, 200]
+        tone_duration = duration / len(frequencies)
+        
+        for freq_idx, frequency in enumerate(frequencies):
+            start_frame = int(freq_idx * tone_duration * sample_rate)
+            end_frame = int((freq_idx + 1) * tone_duration * sample_rate)
+            
+            for i in range(start_frame, min(end_frame, frames)):
+                time = float(i - start_frame) / sample_rate
+                wave = np.sin(2 * np.pi * frequency * time)
+                envelope = max(0, 1 - time / tone_duration)
+                arr[i] = [wave * envelope * 0.3, wave * envelope * 0.3]
+        
+        return (arr * 32767).astype(np.int16)
+    
+    def generate_victory_sound(self):
+        """Generate victory fanfare"""
+        import numpy as np
+        sample_rate = 22050
+        duration = 1.5
+        frames = int(duration * sample_rate)
+        arr = np.zeros((frames, 2))
+        
+        # Ascending sequence for victory
+        frequencies = [400, 500, 600, 800, 1000]
+        tone_duration = duration / len(frequencies)
+        
+        for freq_idx, frequency in enumerate(frequencies):
+            start_frame = int(freq_idx * tone_duration * sample_rate)
+            end_frame = int((freq_idx + 1) * tone_duration * sample_rate)
+            
+            for i in range(start_frame, min(end_frame, frames)):
+                time = float(i - start_frame) / sample_rate
+                wave = np.sin(2 * np.pi * frequency * time)
+                envelope = min(1.0, min(time * 3, (tone_duration - time) * 3))
+                arr[i] = [wave * envelope * 0.4, wave * envelope * 0.4]
+        
+        return (arr * 32767).astype(np.int16)
+    
+    def play_sound(self, sound_name):
+        """Play a sound effect"""
+        if self.sound_enabled and sound_name in self.sounds:
+            try:
+                self.sounds[sound_name].play()
+            except Exception as e:
+                print(f"Warning: Could not play sound {sound_name}: {e}")
+    
+    def start_background_music(self):
+        """Start background music (simple loop)"""
+        if self.music_enabled and not self.music_playing:
+            try:
+                # Generate simple background music
+                bg_music = self.generate_background_music()
+                pygame.mixer.music.load(bg_music)
+                pygame.mixer.music.play(-1)  # Loop indefinitely
+                self.music_playing = True
+            except Exception as e:
+                print(f"Warning: Could not start background music: {e}")
+    
+    def generate_background_music(self):
+        """Generate simple background music"""
+        # For now, return None - background music would need more complex implementation
+        return None
+
+# Global sound manager
+sound_manager = SoundManager()
+
 class Player:
     def __init__(self, x, y):
         self.x = x
@@ -51,6 +261,8 @@ class Player:
         self.lives = 3
         self.invulnerable = 0  # Invulnerability frames after taking damage
         self.animation_frame = 0
+        self.punch_effect = []  # Visual punch effects
+        self.kick_effect = []   # Visual kick effects
         
     def update(self, platforms, camera_x):
         # Handle input
@@ -69,14 +281,30 @@ class Player:
         if (keys[pygame.K_SPACE] or keys[pygame.K_UP] or keys[pygame.K_w]) and self.on_ground:
             self.vel_y = JUMP_STRENGTH
             self.on_ground = False
+            sound_manager.play_sound('jump')
             
         # Combat
         if keys[pygame.K_x] and self.punch_timer <= 0:
             self.punching = True
             self.punch_timer = 20
+            sound_manager.play_sound('punch')
+            # Add punch visual effect
+            punch_x = self.x + (40 if self.facing_right else -40)
+            punch_y = self.y + 20
+            self.punch_effect.append({
+                'x': punch_x, 'y': punch_y, 'timer': 15, 'size': 20
+            })
+            
         if keys[pygame.K_z] and self.kick_timer <= 0:
             self.kicking = True
             self.kick_timer = 25
+            sound_manager.play_sound('kick')
+            # Add kick visual effect
+            kick_x = self.x + (50 if self.facing_right else -50)
+            kick_y = self.y + 30
+            self.kick_effect.append({
+                'x': kick_x, 'y': kick_y, 'timer': 20, 'size': 25
+            })
             
         # Update timers
         if self.punch_timer > 0:
@@ -91,6 +319,12 @@ class Player:
             
         if self.invulnerable > 0:
             self.invulnerable -= 1
+        
+        # Update visual effects
+        self.punch_effect = [effect for effect in self.punch_effect 
+                           if self.update_effect(effect)]
+        self.kick_effect = [effect for effect in self.kick_effect 
+                          if self.update_effect(effect)]
         
         # Apply gravity
         self.vel_y += GRAVITY
@@ -134,14 +368,22 @@ class Player:
         # Animation
         self.animation_frame += 1
     
+    def update_effect(self, effect):
+        """Update visual effect and return True if it should continue"""
+        effect['timer'] -= 1
+        effect['size'] += 1  # Expand effect
+        return effect['timer'] > 0
+    
     def lose_diamonds(self, amount):
         self.diamonds -= amount
+        sound_manager.play_sound('diamond_lost')
         if self.diamonds <= 0:
             self.diamonds = 0
             self.lose_life()
     
     def lose_life(self):
         self.lives -= 1
+        sound_manager.play_sound('life_lost')
         self.diamonds = 50  # Reset diamonds
         self.respawn()
     
@@ -183,14 +425,19 @@ class Player:
         eye_x = screen_x + 16 + (2 if self.facing_right else -2)
         pygame.draw.circle(screen, BLACK, (int(eye_x), int(self.y + 10)), 2)
         
-        # Arms
+        # Arms with enhanced combat visualization
         arm_y = self.y + 20
         if self.punching:
-            # Extended arm for punch
-            arm_x = screen_x + (24 if self.facing_right else 8)
-            pygame.draw.circle(screen, (255, 220, 177), (int(arm_x), int(arm_y)), 4)
+            # Extended arm for punch with more detail
+            arm_x = screen_x + (28 if self.facing_right else 4)
+            # Upper arm
             pygame.draw.line(screen, (255, 220, 177), 
-                           (screen_x + 16, arm_y), (arm_x, arm_y), 6)
+                           (screen_x + 16, arm_y), (arm_x - 8, arm_y), 4)
+            # Forearm
+            pygame.draw.line(screen, (255, 220, 177), 
+                           (arm_x - 8, arm_y), (arm_x, arm_y), 4)
+            # Fist
+            pygame.draw.circle(screen, (255, 200, 150), (int(arm_x), int(arm_y)), 5)
         else:
             # Normal arms
             pygame.draw.circle(screen, (255, 220, 177), 
@@ -198,15 +445,21 @@ class Player:
             pygame.draw.circle(screen, (255, 220, 177), 
                              (int(screen_x + 26), int(arm_y)), 3)
         
-        # Legs
+        # Legs with enhanced kicking visualization
         leg_y = self.y + 48
         if self.kicking:
-            # Extended leg for kick
-            leg_x = screen_x + (28 if self.facing_right else 4)
-            pygame.draw.circle(screen, (255, 220, 177), (int(leg_x), int(leg_y)), 4)
+            # Extended leg for kick with more detail
+            leg_x = screen_x + (32 if self.facing_right else 0)
+            # Thigh
             pygame.draw.line(screen, (255, 220, 177), 
-                           (screen_x + 16, leg_y), (leg_x, leg_y), 6)
-            # Other leg
+                           (screen_x + 16, leg_y - 5), (leg_x - 8, leg_y), 5)
+            # Shin
+            pygame.draw.line(screen, (255, 220, 177), 
+                           (leg_x - 8, leg_y), (leg_x, leg_y), 5)
+            # Foot
+            pygame.draw.ellipse(screen, (50, 50, 50), 
+                              (leg_x - 2, leg_y - 2, 8, 4))
+            # Other leg (standing)
             other_leg_x = screen_x + (8 if self.facing_right else 24)
             pygame.draw.circle(screen, (255, 220, 177), 
                              (int(other_leg_x), int(leg_y)), 3)
@@ -218,17 +471,60 @@ class Player:
             pygame.draw.circle(screen, (255, 220, 177), 
                              (int(screen_x + 22 - offset), int(leg_y)), 3)
         
-        # Combat effects
-        if self.punching:
-            punch_x = screen_x + (self.width if self.facing_right else -PUNCH_RANGE)
-            pygame.draw.circle(screen, YELLOW, 
-                             (int(punch_x + PUNCH_RANGE//2), int(self.y + self.height//2)), 
-                             PUNCH_RANGE//3, 3)
+        # Draw visual effects
+        self.draw_effects(screen, camera_x)
+    
+    def draw_effects(self, screen, camera_x):
+        """Draw punch and kick visual effects"""
+        # Draw punch effects
+        for effect in self.punch_effect:
+            screen_x = effect['x'] - camera_x
+            if -50 < screen_x < SCREEN_WIDTH + 50:
+                # Expanding circle effect
+                alpha = int(255 * (effect['timer'] / 15))
+                color = (*YELLOW[:3], alpha) if len(YELLOW) == 3 else YELLOW
+                
+                # Create multiple rings for impact effect
+                for i in range(3):
+                    radius = effect['size'] + i * 3
+                    if radius > 0:
+                        pygame.draw.circle(screen, YELLOW, 
+                                         (int(screen_x), int(effect['y'])), 
+                                         radius, 2)
+                
+                # Add spark effects
+                for i in range(8):
+                    angle = (i * 45) * math.pi / 180
+                    spark_x = screen_x + math.cos(angle) * effect['size']
+                    spark_y = effect['y'] + math.sin(angle) * effect['size']
+                    pygame.draw.circle(screen, WHITE, 
+                                     (int(spark_x), int(spark_y)), 2)
         
-        if self.kicking:
-            kick_x = screen_x + (self.width if self.facing_right else -KICK_RANGE)
-            pygame.draw.ellipse(screen, RED, 
-                              (kick_x, self.y + self.height//2, KICK_RANGE, 15), 3)
+        # Draw kick effects
+        for effect in self.kick_effect:
+            screen_x = effect['x'] - camera_x
+            if -50 < screen_x < SCREEN_WIDTH + 50:
+                # Expanding arc effect for kick
+                alpha = int(255 * (effect['timer'] / 20))
+                
+                # Create arc effect
+                for i in range(5):
+                    radius = effect['size'] + i * 2
+                    if radius > 0:
+                        # Draw arc
+                        start_angle = -math.pi/4
+                        end_angle = math.pi/4
+                        pygame.draw.arc(screen, RED, 
+                                      (screen_x - radius, effect['y'] - radius, 
+                                       radius * 2, radius * 2),
+                                      start_angle, end_angle, 3)
+                
+                # Add motion lines
+                for i in range(3):
+                    line_x = screen_x + i * 8
+                    pygame.draw.line(screen, ORANGE, 
+                                   (line_x, effect['y'] - 5), 
+                                   (line_x, effect['y'] + 5), 2)
 
 class Platform:
     def __init__(self, x, y, width, height):
@@ -279,6 +575,7 @@ class Diamond:
         if diamond_rect.colliderect(player_rect):
             self.collected = True
             player.diamonds += 1
+            sound_manager.play_sound('diamond_collect')
     
     def draw(self, screen, camera_x):
         if self.collected:
@@ -369,11 +666,13 @@ class Robot:
         if distance_to_player < PUNCH_RANGE and player.punching:
             self.health -= 15
             self.vel_x = 5 if player.facing_right else -5
+            sound_manager.play_sound('robot_hit')
             
         if distance_to_player < KICK_RANGE and player.kicking:
             self.health -= 25
             self.vel_x = 8 if player.facing_right else -8
             self.vel_y = -5
+            sound_manager.play_sound('robot_hit')
             
         # Check if jumped on
         if (abs(self.x - player.x) < 30 and 
@@ -381,6 +680,7 @@ class Robot:
             player.vel_y > 0):
             self.health -= 20
             player.vel_y = -8  # Bounce player up
+            sound_manager.play_sound('robot_hit')
             
         if self.health <= 0:
             self.alive = False
@@ -487,11 +787,13 @@ class Boss:
         if distance_to_player < PUNCH_RANGE and player.punching:
             self.health -= 10
             self.vel_x = 3 if player.facing_right else -3
+            sound_manager.play_sound('boss_hit')
             
         if distance_to_player < KICK_RANGE and player.kicking:
             self.health -= 20
             self.vel_x = 5 if player.facing_right else -5
             self.vel_y = -3
+            sound_manager.play_sound('boss_hit')
             
         # Check if jumped on
         if (abs(self.x - player.x) < 40 and 
@@ -499,6 +801,7 @@ class Boss:
             player.vel_y > 0):
             self.health -= 15
             player.vel_y = -10
+            sound_manager.play_sound('boss_hit')
             
         if self.health <= 0:
             self.alive = False
@@ -550,6 +853,10 @@ def create_level(level_num):
     for i in range(0, WORLD_WIDTH, 200):
         platforms.append(Platform(i, SCREEN_HEIGHT - 40, 180, 40))
     
+    # Boss platform at the very end
+    boss_platform_x = WORLD_WIDTH - 300
+    platforms.append(Platform(boss_platform_x, SCREEN_HEIGHT - 100, 250, 60))
+    
     if level_num == 1:
         # Level 1 - Simple layout
         platforms.extend([
@@ -560,10 +867,9 @@ def create_level(level_num):
             Platform(1600, SCREEN_HEIGHT - 320, 140, 30),
             Platform(2000, SCREEN_HEIGHT - 250, 100, 30),
             Platform(2300, SCREEN_HEIGHT - 400, 120, 30),
-            Platform(2600, SCREEN_HEIGHT - 200, 200, 30),  # Boss platform
         ])
         
-        # Robots
+        # Robots (not near boss area)
         robots.extend([
             Robot(350, SCREEN_HEIGHT - 80),
             Robot(650, SCREEN_HEIGHT - 80),
@@ -573,7 +879,7 @@ def create_level(level_num):
             Robot(2050, SCREEN_HEIGHT - 280),
         ])
         
-        boss = Boss(2650, SCREEN_HEIGHT - 280, 1)
+        boss = Boss(boss_platform_x + 50, SCREEN_HEIGHT - 160, 1)
         
     elif level_num == 2:
         # Level 2 - More complex
@@ -589,7 +895,6 @@ def create_level(level_num):
             Platform(1800, SCREEN_HEIGHT - 300, 100, 30),
             Platform(2000, SCREEN_HEIGHT - 450, 120, 30),
             Platform(2200, SCREEN_HEIGHT - 250, 100, 30),
-            Platform(2500, SCREEN_HEIGHT - 350, 200, 30),  # Boss platform
         ])
         
         robots.extend([
@@ -604,7 +909,7 @@ def create_level(level_num):
             Robot(2050, SCREEN_HEIGHT - 480),
         ])
         
-        boss = Boss(2550, SCREEN_HEIGHT - 430, 2)
+        boss = Boss(boss_platform_x + 50, SCREEN_HEIGHT - 160, 2)
         
     elif level_num == 3:
         # Level 3 - Vertical challenges
@@ -621,7 +926,6 @@ def create_level(level_num):
             Platform(1900, SCREEN_HEIGHT - 320, 100, 30),
             Platform(2100, SCREEN_HEIGHT - 450, 120, 30),
             Platform(2300, SCREEN_HEIGHT - 350, 100, 30),
-            Platform(2600, SCREEN_HEIGHT - 480, 200, 30),  # Boss platform
         ])
         
         robots.extend([
@@ -638,7 +942,7 @@ def create_level(level_num):
             Robot(2350, SCREEN_HEIGHT - 380),
         ])
         
-        boss = Boss(2650, SCREEN_HEIGHT - 560, 3)
+        boss = Boss(boss_platform_x + 50, SCREEN_HEIGHT - 160, 3)
         
     elif level_num == 4:
         # Level 4 - Mixed challenges with tougher robots
@@ -656,7 +960,6 @@ def create_level(level_num):
             Platform(2000, SCREEN_HEIGHT - 450, 120, 30),
             Platform(2200, SCREEN_HEIGHT - 280, 100, 30),
             Platform(2400, SCREEN_HEIGHT - 380, 80, 30),
-            Platform(2700, SCREEN_HEIGHT - 500, 200, 30),  # Boss platform
         ])
         
         robots.extend([
@@ -674,7 +977,7 @@ def create_level(level_num):
             Robot(2250, SCREEN_HEIGHT - 310, "normal"),
         ])
         
-        boss = Boss(2750, SCREEN_HEIGHT - 580, 4)
+        boss = Boss(boss_platform_x + 50, SCREEN_HEIGHT - 160, 4)
         
     else:  # Level 5 - Final challenge
         # Level 5 - Ultimate challenge
@@ -696,7 +999,6 @@ def create_level(level_num):
             Platform(2100, SCREEN_HEIGHT - 300, 80, 30),
             Platform(2250, SCREEN_HEIGHT - 480, 60, 30),
             Platform(2400, SCREEN_HEIGHT - 380, 80, 30),
-            Platform(2750, SCREEN_HEIGHT - 520, 200, 30),  # Boss platform
         ])
         
         robots.extend([
@@ -718,20 +1020,21 @@ def create_level(level_num):
             Robot(2300, SCREEN_HEIGHT - 510, "tough"),
         ])
         
-        boss = Boss(2800, SCREEN_HEIGHT - 600, 5)
+        boss = Boss(boss_platform_x + 50, SCREEN_HEIGHT - 160, 5)
     
-    # Add diamonds throughout the level
+    # Add diamonds throughout the level (but not in boss area)
     diamond_positions = []
-    for platform in platforms[1:]:  # Skip ground platforms
-        # Add diamonds on platforms
-        for i in range(2):
-            diamond_x = platform.rect.x + random.randint(10, platform.rect.width - 20)
-            diamond_y = platform.rect.y - 20
-            diamond_positions.append((diamond_x, diamond_y))
+    for platform in platforms[1:-1]:  # Skip ground platforms and boss platform
+        if platform.rect.x < WORLD_WIDTH - 500:  # Don't place diamonds near boss
+            # Add diamonds on platforms
+            for i in range(2):
+                diamond_x = platform.rect.x + random.randint(10, platform.rect.width - 20)
+                diamond_y = platform.rect.y - 20
+                diamond_positions.append((diamond_x, diamond_y))
     
-    # Add some floating diamonds
+    # Add some floating diamonds (not near boss area)
     for i in range(level_num * 5):
-        x = random.randint(100, WORLD_WIDTH - 100)
+        x = random.randint(100, WORLD_WIDTH - 600)  # Keep away from boss area
         y = random.randint(200, SCREEN_HEIGHT - 200)
         diamond_positions.append((x, y))
     
@@ -817,13 +1120,14 @@ def main():
                     boss.update(platforms, player)
                     if not boss.alive:
                         score += 500
+                        sound_manager.play_sound('level_complete')
                         game_state = "level_complete"
                         transition_timer = 180  # 3 seconds
                 
                 # Check if player reached boss area without defeating all robots
-                if player.x > WORLD_WIDTH - 400 and len([r for r in robots if r.alive]) > 0:
+                if player.x > WORLD_WIDTH - 500 and len([r for r in robots if r.alive]) > 0:
                     # Push player back
-                    player.x = WORLD_WIDTH - 400
+                    player.x = WORLD_WIDTH - 500
                     
             else:
                 game_state = "game_over"

@@ -2,6 +2,68 @@
 
 All notable changes to Retro Platform Fighter - Diamond Quest will be documented in this file.
 
+## [1.1.0] - 2025-06-25
+
+### Added
+- **Enhanced Combat Visuals**: 
+  - Detailed punch animations with extended arm, fist visualization
+  - Detailed kick animations with extended leg, foot visualization
+  - Dynamic visual effects for punches (expanding rings with sparks)
+  - Dynamic visual effects for kicks (arc effects with motion lines)
+  - Combat effects persist and animate over multiple frames
+- **Complete Sound System**:
+  - Procedurally generated sound effects using numpy
+  - Punch sound: Sharp, quick tone (440Hz square wave)
+  - Kick sound: Deeper, longer tone (220Hz square wave)
+  - Jump sound: Rising frequency sweep (200-400Hz)
+  - Diamond collect: Pleasant chime (800Hz sine wave)
+  - Diamond lost: Descending tone sweep (400-200Hz)
+  - Life lost: Dramatic descending sequence (400-200Hz)
+  - Robot hit: Metallic clang noise
+  - Boss hit: Deep metallic sound (150Hz)
+  - Level complete: Victory fanfare (ascending 400-1000Hz)
+- **Improved Boss Mechanics**:
+  - Boss now spawns at the very end of each level (last 300px)
+  - Dedicated boss platform elevated above ground
+  - Player cannot access boss area until all robots are defeated
+  - Boss area clearly separated from main level content
+  - Enhanced boss positioning and platform design
+- **Enhanced Audio Integration**:
+  - Sound effects triggered by all player actions
+  - Audio feedback for damage taken and dealt
+  - Environmental audio cues for game state changes
+  - Robust error handling for audio system failures
+
+### Changed
+- **Player Character Improvements**:
+  - More detailed arm and leg rendering during combat
+  - Enhanced fist and foot visualization
+  - Better combat animation timing and visual feedback
+  - Improved character proportions and detail
+- **Level Design Updates**:
+  - Boss platforms repositioned to map endpoints
+  - Diamond placement optimized to avoid boss areas
+  - Clearer separation between main level and boss arena
+  - Improved platform spacing for boss encounters
+- **Combat System Enhancements**:
+  - Visual effects now expand and animate over time
+  - Multiple effect layers for more impactful combat
+  - Better timing synchronization between audio and visual effects
+  - Enhanced feedback for successful hits
+
+### Technical Improvements
+- **Dependencies**: Added numpy>=1.20.0 for sound generation
+- **Audio Engine**: Implemented procedural sound generation system
+- **Performance**: Optimized visual effects rendering
+- **Error Handling**: Graceful degradation when audio unavailable
+- **Code Structure**: Modular sound management system
+
+### Fixed
+- Boss positioning now consistent across all levels
+- Combat visual effects properly synchronized with actions
+- Audio system handles missing dependencies gracefully
+- Level boundaries properly enforce boss area restrictions
+
 ## [1.0.0] - 2025-06-25
 
 ### Added
@@ -74,13 +136,13 @@ All notable changes to Retro Platform Fighter - Diamond Quest will be documented
 
 ### Known Issues
 - Graphics are geometric shapes (planned for sprite upgrade)
-- No sound system implemented yet
+- No background music implemented yet
 - No save/load functionality
 - Limited animation frames
 
 ### Future Plans
 - Enhanced sprite graphics
-- Sound effects and music
+- Background music system
 - Power-up system
 - Additional levels
 - Multiplayer support

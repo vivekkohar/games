@@ -31,17 +31,30 @@ A classic 2D platformer game built with Python and Pygame, featuring a young her
 - **Smart AI**: Patrol patterns and player-chasing behavior
 - **Combat Mechanics**: Vulnerable to punches, kicks, and jump attacks
 
-### 👹 Boss Battles
-- **Level Bosses**: Unique boss at the end of each level
-- **Progressive Difficulty**: Bosses get stronger and smarter each level
-- **Advanced AI**: Different attack patterns and special abilities
-- **Gatekeeper System**: Must defeat all robots before accessing boss
-
 ### 🎯 Game Progression
 - **5 Challenging Levels**: From beginner-friendly to expert difficulty
 - **Lives System**: 3 lives with respawn mechanics
 - **Score Tracking**: Points for diamonds (10), robots (100), and bosses (500)
 - **Victory Conditions**: Complete all levels to achieve ultimate victory
+
+### 👹 Boss Battles
+- **End-Level Positioning**: Bosses located at the very end of each level
+- **Gatekeeper System**: Must defeat all robots before accessing boss area
+- **Progressive Difficulty**: Each boss stronger and smarter than the last
+- **Epic Encounters**: Dedicated boss platforms for climactic battles
+
+### 🎵 Audio System
+- **Complete Sound Effects**: Procedurally generated audio for all actions
+- **Combat Audio**: Distinct sounds for punches, kicks, and hits
+- **Environmental Audio**: Jump, diamond collection, and life events
+- **Dynamic Feedback**: Audio cues for damage, victories, and defeats
+- **Robust Design**: Graceful handling of audio system failures
+
+### 🥊 Enhanced Combat Visuals
+- **Detailed Animations**: Realistic arm and leg movements during attacks
+- **Visual Effects**: Expanding rings, sparks, and motion trails
+- **Combat Feedback**: Clear visual indication of successful hits
+- **Persistent Effects**: Multi-frame animations for impactful combat
 
 ## 🎮 Controls
 
@@ -74,9 +87,9 @@ A classic 2D platformer game built with Python and Pygame, featuring a young her
    conda activate gamer
    ```
 
-3. **Install Pygame**:
+3. **Install dependencies**:
    ```bash
-   conda install -c conda-forge pygame
+   conda install -c conda-forge pygame numpy
    ```
 
 4. **Run the game**:

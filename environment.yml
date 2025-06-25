@@ -5,6 +5,7 @@ channels:
 dependencies:
   - python=3.13
   - pygame>=2.6.0
+  - numpy>=1.20.0
   - pip
   - pip:
     - # Add any pip-only packages here if needed
