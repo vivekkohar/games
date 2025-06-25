@@ -2,6 +2,37 @@
 
 All notable changes to Retro Platform Fighter - Diamond Quest will be documented in this file.
 
+## [1.1.1] - 2025-06-25
+
+### Fixed
+- **Infinite Jumping Exploit**: Fixed player ability to gain unlimited height by repeatedly jumping on robots/bosses
+- **Jump Cooldown System**: Added 10-15 frame cooldown after bouncing off enemies to prevent spam
+- **Boss Combat**: Bosses now actively fight instead of being passive
+
+### Enhanced
+- **Advanced Boss AI System**:
+  - **Level 1-2 Bosses**: Aggressive chase and charge attacks with close combat
+  - **Level 3-5 Bosses**: Four distinct attack patterns:
+    - Aggressive Mode: Fast chase with close combat (8-12 damage)
+    - Jump Attack Mode: Aerial attacks from above (15 damage)
+    - Charge Mode: High-speed charging attacks (12-15 damage)  
+    - Defensive Mode: Quick strikes with positioning (8 damage)
+  - **Enraged Mode**: When health < 30%, bosses become faster and more aggressive
+  - **Boss Boundaries**: Bosses stay within their designated arena area
+- **Dynamic Boss Visuals**:
+  - Color changes during different attack states (red glow when charging)
+  - Pulsing effects when enraged (low health)
+  - Larger, more intense eyes during aggressive modes
+  - Visual attack indicators (jump preparation, charge lines)
+  - Dynamic health bar colors (green → yellow → red)
+  - Attack mode text display for advanced bosses (Level 3+)
+
+### Balance Changes
+- **Boss Damage Scaling**: Different attack types deal varying damage (6-15 diamonds)
+- **Invulnerability Periods**: Adjusted based on attack severity (30-90 frames)
+- **Movement Speed**: Boss speed now scales with level difficulty
+- **Attack Frequency**: Higher level bosses attack more frequently when enraged
+
 ## [1.1.0] - 2025-06-25
 
 ### Added
