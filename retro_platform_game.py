@@ -263,6 +263,7 @@ class Player:
         self.animation_frame = 0
         self.punch_effect = []  # Visual punch effects
         self.kick_effect = []   # Visual kick effects
+        self.jump_cooldown = 0  # Prevent infinite jumping on enemies
         
     def update(self, platforms, camera_x):
         # Handle input
@@ -319,6 +320,9 @@ class Player:
             
         if self.invulnerable > 0:
             self.invulnerable -= 1
+        
+        if self.jump_cooldown > 0:
+            self.jump_cooldown -= 1
         
         # Update visual effects
         self.punch_effect = [effect for effect in self.punch_effect 
@@ -681,6 +685,8 @@ class Robot:
             self.health -= 20
             player.vel_y = -8  # Bounce player up
             sound_manager.play_sound('robot_hit')
+            # Add cooldown to prevent infinite bouncing
+            player.jump_cooldown = 10
             
         if self.health <= 0:
             self.alive = False
@@ -727,6 +733,10 @@ class Boss:
         self.phase = 0
         self.attack_pattern = 0
         self.animation = 0
+        self.move_timer = 0
+        self.jump_timer = 0
+        self.charge_timer = 0
+        self.is_charging = False
         
     def update(self, platforms, player):
         if not self.alive:
@@ -735,37 +745,118 @@ class Boss:
         self.animation += 0.1
         distance_to_player = abs(self.x - player.x)
         
-        # Boss AI based on level
+        # Update timers
+        self.attack_timer += 1
+        self.move_timer += 1
+        self.jump_timer += 1
+        
+        # Boss AI based on level and health percentage
+        health_percentage = self.health / self.max_health
+        
         if self.level <= 2:
-            # Simple chase and attack
-            if player.x > self.x:
-                self.vel_x = 2
-            else:
-                self.vel_x = -2
-                
-            if distance_to_player < 60 and player.invulnerable == 0:
-                self.attack_timer += 1
-                if self.attack_timer > 90:
-                    player.lose_diamonds(10)
-                    player.invulnerable = 90
+            # Simple aggressive boss
+            if self.attack_timer > 60:  # Attack every second
+                if distance_to_player < 80:
+                    # Close range attack
+                    if player.invulnerable == 0 and not (player.punching or player.kicking):
+                        player.lose_diamonds(8)
+                        player.invulnerable = 60
+                        sound_manager.play_sound('robot_hit')
                     self.attack_timer = 0
+                elif distance_to_player < 150:
+                    # Charge at player
+                    self.is_charging = True
+                    self.charge_timer = 30
+                    if player.x > self.x:
+                        self.vel_x = 4
+                    else:
+                        self.vel_x = -4
+                    self.attack_timer = 0
+            
+            # Normal movement when not attacking
+            if not self.is_charging and self.move_timer > 120:
+                if player.x > self.x:
+                    self.vel_x = 2
+                else:
+                    self.vel_x = -2
+                self.move_timer = 0
+                
         else:
-            # Advanced patterns for higher levels
-            self.attack_timer += 1
-            if self.attack_timer > 120:
-                self.attack_pattern = (self.attack_pattern + 1) % 3
+            # Advanced boss with multiple attack patterns
+            if self.attack_timer > 90:
+                self.attack_pattern = (self.attack_pattern + 1) % 4
                 self.attack_timer = 0
                 
-            if self.attack_pattern == 0:  # Chase
+            if self.attack_pattern == 0:  # Aggressive chase
                 if player.x > self.x:
-                    self.vel_x = 3
+                    self.vel_x = 3 + self.level * 0.5
                 else:
-                    self.vel_x = -3
+                    self.vel_x = -(3 + self.level * 0.5)
+                    
+                # Close combat
+                if distance_to_player < 70 and player.invulnerable == 0:
+                    if not (player.punching or player.kicking):
+                        player.lose_diamonds(10 + self.level * 2)
+                        player.invulnerable = 45
+                        sound_manager.play_sound('robot_hit')
+                        
             elif self.attack_pattern == 1:  # Jump attack
-                if distance_to_player < 100:
-                    self.vel_y = -12
-            else:  # Stay still and shoot (visual effect only)
-                self.vel_x = 0
+                if self.jump_timer > 60 and distance_to_player < 200:
+                    self.vel_y = -15
+                    self.jump_timer = 0
+                    # Damage player if boss lands on them
+                    if (distance_to_player < 50 and 
+                        abs(self.y - player.y) < 30 and 
+                        player.invulnerable == 0):
+                        player.lose_diamonds(15)
+                        player.invulnerable = 90
+                        sound_manager.play_sound('robot_hit')
+                        
+            elif self.attack_pattern == 2:  # Charge attack
+                self.is_charging = True
+                self.charge_timer = 45
+                charge_speed = 5 + self.level
+                if player.x > self.x:
+                    self.vel_x = charge_speed
+                else:
+                    self.vel_x = -charge_speed
+                    
+                # Damage during charge
+                if (distance_to_player < 60 and 
+                    player.invulnerable == 0 and 
+                    not (player.punching or player.kicking)):
+                    player.lose_diamonds(12 + self.level)
+                    player.invulnerable = 60
+                    sound_manager.play_sound('robot_hit')
+                    
+            else:  # Defensive pattern with occasional strikes
+                self.vel_x *= 0.8  # Slow down
+                if distance_to_player < 100 and self.move_timer > 30:
+                    # Quick strike
+                    if player.invulnerable == 0:
+                        player.lose_diamonds(8)
+                        player.invulnerable = 75
+                        sound_manager.play_sound('robot_hit')
+                    self.move_timer = 0
+        
+        # Handle charging state
+        if self.is_charging:
+            self.charge_timer -= 1
+            if self.charge_timer <= 0:
+                self.is_charging = False
+                self.vel_x *= 0.5  # Slow down after charge
+        
+        # Enraged mode when health is low
+        if health_percentage < 0.3:
+            self.vel_x *= 1.5  # Move faster when low health
+            if self.attack_timer > 45:  # Attack more frequently
+                if (distance_to_player < 90 and 
+                    player.invulnerable == 0 and 
+                    not (player.punching or player.kicking)):
+                    player.lose_diamonds(6)
+                    player.invulnerable = 30
+                    sound_manager.play_sound('robot_hit')
+                    self.attack_timer = 0
         
         # Apply gravity
         self.vel_y += GRAVITY
@@ -782,6 +873,14 @@ class Boss:
                 if self.vel_y > 0 and self.y < platform.rect.top:
                     self.y = platform.rect.top - self.height
                     self.vel_y = 0
+        
+        # Keep boss in boss area (don't let it wander too far)
+        if self.x < WORLD_WIDTH - 600:
+            self.x = WORLD_WIDTH - 600
+            self.vel_x = abs(self.vel_x)  # Turn around
+        elif self.x > WORLD_WIDTH - 100:
+            self.x = WORLD_WIDTH - 100
+            self.vel_x = -abs(self.vel_x)  # Turn around
                     
         # Check if hit by player
         if distance_to_player < PUNCH_RANGE and player.punching:
@@ -795,12 +894,14 @@ class Boss:
             self.vel_y = -3
             sound_manager.play_sound('boss_hit')
             
-        # Check if jumped on
+        # Check if jumped on (with cooldown to prevent infinite bouncing)
         if (abs(self.x - player.x) < 40 and 
             player.y + player.height < self.y + 15 and 
-            player.vel_y > 0):
+            player.vel_y > 0 and 
+            player.jump_cooldown == 0):
             self.health -= 15
             player.vel_y = -10
+            player.jump_cooldown = 15  # Prevent immediate re-bounce
             sound_manager.play_sound('boss_hit')
             
         if self.health <= 0:
@@ -818,30 +919,93 @@ class Boss:
         colors = [(100, 0, 100), (150, 0, 0), (0, 100, 100), (100, 100, 0), (150, 50, 150)]
         boss_color = colors[min(self.level - 1, 4)]
         
+        # Charging effect - make boss glow red
+        if self.is_charging:
+            boss_color = (255, 50, 50)
+        
+        # Enraged effect when health is low
+        health_percentage = self.health / self.max_health
+        if health_percentage < 0.3:
+            # Pulsing red effect when low health
+            pulse_intensity = int(abs(math.sin(self.animation * 3)) * 100)
+            boss_color = (min(255, boss_color[0] + pulse_intensity), 
+                         boss_color[1], boss_color[2])
+        
         # Pulsing effect
-        pulse = int(math.sin(self.animation) * 5)
+        pulse = int(math.sin(self.animation) * 3)
         pygame.draw.rect(screen, boss_color, 
                         (screen_x - pulse, self.y - pulse, 
                          self.width + pulse*2, self.height + pulse*2))
         
         # Boss head
-        pygame.draw.rect(screen, (200, 200, 200), 
+        head_color = (200, 200, 200)
+        if self.is_charging:
+            head_color = (255, 200, 200)
+        pygame.draw.rect(screen, head_color, 
                         (screen_x + 10, self.y - 15, self.width - 20, 20))
         
-        # Glowing eyes
-        eye_color = (255, 0, 0) if self.animation % 1 < 0.5 else (255, 100, 100)
-        pygame.draw.circle(screen, eye_color, (int(screen_x + 20), int(self.y - 5)), 5)
-        pygame.draw.circle(screen, eye_color, (int(screen_x + self.width - 20), int(self.y - 5)), 5)
+        # Glowing eyes - more intense when attacking
+        if self.attack_pattern == 0 or self.is_charging:  # Aggressive mode
+            eye_color = (255, 0, 0)
+            eye_size = 6
+        elif health_percentage < 0.3:  # Enraged mode
+            eye_color = (255, 100, 0) if self.animation % 1 < 0.5 else (255, 0, 0)
+            eye_size = 7
+        else:
+            eye_color = (255, 0, 0) if self.animation % 1 < 0.5 else (255, 100, 100)
+            eye_size = 5
+            
+        pygame.draw.circle(screen, eye_color, (int(screen_x + 20), int(self.y - 5)), eye_size)
+        pygame.draw.circle(screen, eye_color, (int(screen_x + self.width - 20), int(self.y - 5)), eye_size)
+        
+        # Attack pattern indicator
+        if self.attack_pattern == 1:  # Jump attack mode
+            # Show jump preparation
+            for i in range(3):
+                pygame.draw.circle(screen, (255, 255, 0), 
+                                 (int(screen_x + self.width//2), int(self.y + self.height + 5 + i*3)), 
+                                 2)
+        elif self.attack_pattern == 2 or self.is_charging:  # Charge mode
+            # Show charge lines
+            for i in range(5):
+                line_x = screen_x - 10 - i*5
+                pygame.draw.line(screen, (255, 100, 0), 
+                               (line_x, self.y + 20), (line_x, self.y + 60), 2)
         
         # Health bar
         bar_width = int((self.health / self.max_health) * self.width)
+        bar_color = GREEN
+        if health_percentage < 0.5:
+            bar_color = YELLOW
+        if health_percentage < 0.3:
+            bar_color = RED
+            
         pygame.draw.rect(screen, RED, (screen_x, self.y - 25, self.width, 6))
-        pygame.draw.rect(screen, GREEN, (screen_x, self.y - 25, bar_width, 6))
+        pygame.draw.rect(screen, bar_color, (screen_x, self.y - 25, bar_width, 6))
         
         # Boss level indicator
         font = pygame.font.Font(None, 24)
         level_text = font.render(f"BOSS LV.{self.level}", True, WHITE)
         screen.blit(level_text, (screen_x, self.y - 45))
+        
+        # Attack mode indicator
+        if self.level > 2:
+            mode_text = ""
+            if self.attack_pattern == 0:
+                mode_text = "AGGRESSIVE"
+            elif self.attack_pattern == 1:
+                mode_text = "JUMP ATTACK"
+            elif self.attack_pattern == 2:
+                mode_text = "CHARGING"
+            else:
+                mode_text = "DEFENSIVE"
+                
+            if health_percentage < 0.3:
+                mode_text = "ENRAGED!"
+                
+            mode_font = pygame.font.Font(None, 18)
+            mode_surface = mode_font.render(mode_text, True, YELLOW)
+            screen.blit(mode_surface, (screen_x, self.y - 65))
 
 def create_level(level_num):
     platforms = []
