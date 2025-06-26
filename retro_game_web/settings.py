@@ -16,7 +16,7 @@ SECRET_KEY = 'django-insecure-si*91&88_=t2%$by+12vg#k3kxo@zx40b#-q*d&hg455n5hedk
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0','v-games.azurewebsites.net']
 
 # Application definition
 INSTALLED_APPS = [
