@@ -4,7 +4,6 @@ __pycache__/
 *$py.class
 *.so
 .Python
-.azure-*
 env/
 build/
 develop-eggs/
@@ -26,12 +25,12 @@ var/
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
-media/
+media
 
 # Static files
 staticfiles/
 
-# Virtual Environment
+# Virtual environments
 venv/
 ENV/
 env/
@@ -41,6 +40,9 @@ env/
 .vscode/
 *.swp
 *.swo
+.project
+.pydevproject
+.settings/
 
 # OS specific
 .DS_Store
@@ -51,7 +53,5 @@ env/
 ehthumbs.db
 Thumbs.db
 
-# Azure
-.azure/
-.env
-.env.local
+# Project specific
+media/game_thumbnails/

@@ -26,7 +26,7 @@ A Django web application featuring multiple games, including the Retro Platform 
 ## 🚀 Installation & Setup
 
 ### Prerequisites
-- Python 3.7 or higher
+- Python 3.11 or higher
 - Conda package manager
 
 ### Quick Start
@@ -37,58 +37,39 @@ A Django web application featuring multiple games, including the Retro Platform 
    cd games-collection
    ```
 
-2. **Activate the conda environment**:
+2. **Run the setup script**:
+   ```bash
+   ./setup.sh
+   ```
+
+3. **Activate the conda environment**:
    ```bash
    conda activate gamer
    ```
 
-3. **Install additional dependencies** (if not already installed):
+4. **Start the server**:
    ```bash
-   conda install django pillow -y
+   ./run.sh
    ```
 
-4. **Run database migrations**:
-   ```bash
-   python manage.py migrate
-   ```
-
-5. **Create a superuser** (optional, for admin access):
-   ```bash
-   python manage.py createsuperuser
-   ```
-
-6. **Start the development server**:
-   ```bash
-   python manage.py runserver
-   ```
-
-7. **Open your browser** and navigate to:
+5. **Open your browser** and navigate to:
    ```
    http://localhost:8000/
    ```
 
 ## 🌐 Deployment
 
-### Azure Web Apps Deployment
+This project can be deployed to any standard Django hosting platform.
 
-This project is configured for deployment to Azure Web Apps using GitHub Actions. For detailed instructions, see [AZURE_DEPLOYMENT.md](AZURE_DEPLOYMENT.md).
+For local development:
 
-Quick deployment steps:
+```bash
+# Activate conda environment
+conda activate gamer
 
-1. **Set up Azure resources**:
-   ```bash
-   ./setup-azure-deployment.sh
-   ```
-
-2. **Push to GitHub**:
-   ```bash
-   git push origin main
-   ```
-
-3. **Access your deployed application**:
-   ```
-   https://v-games.azurewebsites.net
-   ```
+# Start the development server
+./run.sh
+```
 
 ## 🎮 How to Play Retro Platform Fighter
 
@@ -113,7 +94,7 @@ Quick deployment steps:
 ### 🖥️ Backend (Django)
 - **Models**: Game sessions, high scores, game states
 - **Views**: Game rendering, API endpoints, leaderboards
-- **Database**: SQLite (development) / PostgreSQL (production)
+- **Database**: SQLite (development)
 - **Session Management**: Django sessions for game state persistence
 
 ### 🎨 Frontend (HTML5/JavaScript)
@@ -154,8 +135,8 @@ games-collection/
 │   └── asgi.py
 ├── manage.py                # Django management script
 ├── requirements.txt         # Project dependencies
-├── start_server.sh          # Server startup script
-└── setup-azure-deployment.sh # Azure deployment script
+├── setup.sh                 # Setup script
+└── run.sh                   # Server startup script
 ```
 
 ### Adding New Games
