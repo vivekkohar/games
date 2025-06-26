@@ -28,6 +28,24 @@ A Django web application featuring multiple games, including the Retro Platform 
 ### Prerequisites
 - Python 3.11 or higher
 - Conda package manager
+- PostgreSQL database
+
+### Database Setup
+
+1. **Create a PostgreSQL database**:
+   ```sql
+   CREATE DATABASE games_db;
+   CREATE USER games_user WITH PASSWORD 'your_password';
+   GRANT ALL PRIVILEGES ON DATABASE games_db TO games_user;
+   ```
+
+2. **Configure your database connection**:
+   Create a `.env` file in the project root with:
+   ```
+   DATABASE_URL=postgres://games_user:your_password@localhost:5432/games_db
+   DEBUG=True
+   SECRET_KEY=your_secret_key
+   ```
 
 ### Quick Start
 
@@ -47,12 +65,17 @@ A Django web application featuring multiple games, including the Retro Platform 
    conda activate gamer
    ```
 
-4. **Start the server**:
+4. **Initialize the database**:
+   ```bash
+   ./init_db.sh
+   ```
+
+5. **Start the server**:
    ```bash
    ./run.sh
    ```
 
-5. **Open your browser** and navigate to:
+6. **Open your browser** and navigate to:
    ```
    http://localhost:8000/
    ```

@@ -2,10 +2,24 @@
 Django==5.2.0
 Pillow==10.1.0
 
+# Database
+psycopg2-binary==2.9.9
+dj-database-url==2.1.0
+
 # Static files
 whitenoise==6.6.0
 
-# Utilities
-django-cors-headers==4.3.1
+# Configuration
 python-decouple==3.8
-dj-database-url==2.1.0
+
+# Security and CORS
+django-cors-headers==4.3.1
+
+# Production server
+gunicorn==21.2.0
+
+# Monitoring and logging
+sentry-sdk[django]==1.40.0
+
+# Performance
+django-redis==5.4.0

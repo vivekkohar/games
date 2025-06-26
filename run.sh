@@ -20,6 +20,8 @@ fi
 
 # Run migrations
 echo "🗄️  Setting up database..."
+python manage.py makemigrations games_manager
+python manage.py makemigrations retro_platform_fighter
 python manage.py migrate
 
 # Create superuser if it doesn't exist
@@ -32,6 +34,23 @@ if not User.objects.filter(username='admin').exists():
     print('✅ Admin user created')
 else:
     print('✅ Admin user already exists')
+"
+
+# Create initial game entries if games_manager_game table is empty
+echo "🎮 Setting up initial games..."
+python manage.py shell -c "
+from games_manager.models import Game
+if Game.objects.count() == 0:
+    Game.objects.create(
+        name='Retro Platform Fighter',
+        slug='retro-platform-fighter',
+        description='A classic 2D platformer with combat mechanics',
+        url_path='/retro_platform_fighter/',
+        is_active=True
+    )
+    print('✅ Initial game entries created')
+else:
+    print('✅ Game entries already exist')
 "
 
 echo ""
