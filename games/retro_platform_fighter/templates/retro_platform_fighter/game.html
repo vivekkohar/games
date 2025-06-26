@@ -1,0 +1,119 @@
+{% extends 'retro_platform_fighter/base.html' %}
+{% load static %}
+
+{% block title %}Play Game - Retro Platform Fighter{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="game-container">
+        <h1>Retro Platform Fighter</h1>
+        
+        <div class="game-info">
+            <div class="info-item">
+                <a href="{% url 'retro_platform_fighter:index' %}" class="btn" style="background-color: #666;">
+                    ← Back to Game Info
+                </a>
+            </div>
+            
+            <div class="game-controls">
+                <button class="btn" onclick="pauseGame()">⏸️ Pause</button>
+                <button class="btn" onclick="resetGame()">🔄 Reset</button>
+                <button class="btn" onclick="saveGame()">💾 Save</button>
+            </div>
+        </div>
+        
+        <!-- Game Status Display -->
+        <div class="game-status">
+            <div class="status-item">
+                <span class="status-label">Level:</span>
+                <span id="levelDisplay" class="status-value">1</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">💎 Diamonds:</span>
+                <span id="diamondsDisplay" class="status-value">50</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">❤️ Lives:</span>
+                <span id="livesDisplay" class="status-value">3</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">🏆 Score:</span>
+                <span id="scoreDisplay" class="status-value">0</span>
+            </div>
+        </div>
+        
+        <canvas id="gameCanvas" width="1024" height="768"></canvas>
+        
+        <div class="loading" id="loadingMessage">
+            🎮 Loading game... Please wait!
+        </div>
+    </div>
+
+    <div class="game-message" id="gameMessage">
+        <h2 id="messageTitle">Game Paused</h2>
+        <p id="messageText">Press ESC to resume</p>
+        <div id="messageButtons"></div>
+    </div>
+
+    <div class="game-info">
+        <h3>🎮 Quick Controls Reminder</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; text-align: left;">
+            <div>
+                <strong>Movement:</strong><br>
+                Arrow Keys or WASD<br>
+                Space/↑ to Jump
+            </div>
+            <div>
+                <strong>Combat:</strong><br>
+                X = Punch<br>
+                Z = Kick
+            </div>
+            <div>
+                <strong>Game:</strong><br>
+                ESC = Pause<br>
+                R = Restart
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% load static %}
+<script>
+// Game state from Django
+const initialGameState = {
+    level: {{ game_session.current_level }},
+    diamonds: {{ game_session.diamonds }},
+    lives: {{ game_session.lives }},
+    score: {{ game_session.score }},
+    playerX: {{ game_session.player_x }},
+    playerY: {{ game_session.player_y }},
+    robotsDefeated: {{ game_state.get_robots_defeated|safe }},
+    diamondsCollected: {{ game_state.get_diamonds_collected|safe }},
+    bossDefeated: {{ game_state.boss_defeated|yesno:"true,false" }},
+    levelCompleted: {{ game_state.level_completed|yesno:"true,false" }}
+};
+
+// CSRF token for Django
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+const csrftoken = getCookie('csrftoken');
+
+console.log('🎮 Game page loaded, initial state:', initialGameState);
+</script>
+<script src="{% static 'retro_platform_fighter/js/game.js' %}"></script>
+{% endblock %}

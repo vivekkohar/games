@@ -1,0 +1,62 @@
+{% extends 'games_manager/base.html' %}
+
+{% block title %}Retro Platform Fighter - Retro Games Collection{% endblock %}
+
+{% block content %}
+<section class="container" style="padding-top: 40px;">
+    <h1>Retro Platform Fighter</h1>
+    
+    <div style="max-width: 800px; margin: 0 auto; text-align: center;">
+        <div style="background-color: #333; height: 300px; display: flex; justify-content: center; align-items: center; font-size: 72px; margin-bottom: 30px; border-radius: 10px;">
+            🎮
+        </div>
+        
+        <p>
+            A classic 2D platformer game with combat mechanics, diamond collection, and boss battles.
+            Fight your way through 5 progressive levels, defeat robots, and collect diamonds to survive!
+        </p>
+        
+        <div style="margin: 30px 0;">
+            <a href="{% url 'retro_platform_fighter:game' %}" class="btn" style="font-size: 20px; padding: 15px 30px;">
+                Play Now
+            </a>
+            <a href="{% url 'retro_platform_fighter:leaderboard' %}" class="btn" style="font-size: 20px; padding: 15px 30px; background-color: #666; margin-left: 20px;">
+                Leaderboard
+            </a>
+        </div>
+        
+        <h2>Game Features</h2>
+        <ul style="text-align: left; display: inline-block;">
+            <li>5 Progressive Levels with increasing difficulty</li>
+            <li>Combat System: Punch, kick, and jump attacks</li>
+            <li>Diamond Collection: Collect diamonds as health/currency</li>
+            <li>Boss Battles: Epic end-level boss encounters</li>
+            <li>Smart AI: Robots with patrol and chase behaviors</li>
+        </ul>
+        
+        <h2>Controls</h2>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; text-align: left; max-width: 500px; margin: 0 auto;">
+            <div>
+                <strong>Movement:</strong><br>
+                Arrow Keys or WASD<br>
+                Space/↑ to Jump
+            </div>
+            <div>
+                <strong>Combat:</strong><br>
+                X = Punch (close range)<br>
+                Z = Kick (longer range)
+            </div>
+            <div>
+                <strong>Game:</strong><br>
+                ESC = Pause/Resume<br>
+                R = Restart (when game over)
+            </div>
+            <div>
+                <strong>Other:</strong><br>
+                Save button = Save progress<br>
+                Reset button = Reset game
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

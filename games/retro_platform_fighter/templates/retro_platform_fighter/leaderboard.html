@@ -1,0 +1,57 @@
+{% extends 'retro_platform_fighter/base.html' %}
+
+{% block title %}Leaderboard - Retro Platform Fighter{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: 40px;">
+    <h1>Retro Platform Fighter Leaderboard</h1>
+    
+    <div style="text-align: center; margin-bottom: 30px;">
+        <a href="{% url 'retro_platform_fighter:index' %}" class="btn" style="background-color: #666;">
+            ← Back to Game Info
+        </a>
+        <a href="{% url 'retro_platform_fighter:game' %}" class="btn">
+            Play Game
+        </a>
+    </div>
+    
+    <div style="background-color: rgba(0,0,0,0.3); border-radius: 10px; padding: 20px; max-width: 800px; margin: 0 auto;">
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="border-bottom: 2px solid #4a6bff;">
+                    <th style="padding: 10px; text-align: center;">#</th>
+                    <th style="padding: 10px; text-align: left;">Player</th>
+                    <th style="padding: 10px; text-align: center;">Score</th>
+                    <th style="padding: 10px; text-align: center;">Level</th>
+                    <th style="padding: 10px; text-align: center;">Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for score in high_scores %}
+                <tr style="border-bottom: 1px solid #333; {% if forloop.counter <= 3 %}background-color: rgba(74, 107, 255, 0.{{ 9|add:"-" }}{{ forloop.counter }});{% endif %}">
+                    <td style="padding: 10px; text-align: center;">
+                        {% if forloop.counter == 1 %}
+                            🥇
+                        {% elif forloop.counter == 2 %}
+                            🥈
+                        {% elif forloop.counter == 3 %}
+                            🥉
+                        {% else %}
+                            {{ forloop.counter }}
+                        {% endif %}
+                    </td>
+                    <td style="padding: 10px; text-align: left;">{{ score.player_name }}</td>
+                    <td style="padding: 10px; text-align: center; font-weight: bold;">{{ score.score }}</td>
+                    <td style="padding: 10px; text-align: center;">{{ score.level_reached }}</td>
+                    <td style="padding: 10px; text-align: center; font-size: 0.9em;">{{ score.created_at|date:"M d, Y" }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" style="padding: 20px; text-align: center;">No high scores yet. Be the first to play!</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,18 +1,16 @@
-# Retro Platform Fighter - Diamond Quest
-# Python package requirements
+# Django and core dependencies
+Django==5.2.0
+whitenoise==6.6.0
 
-# Core game engine
-pygame>=2.6.0
+# Database support
+dj-database-url==2.1.0
 
-# Sound generation and effects
-numpy>=1.20.0
+# Security and utilities
+python-decouple==3.8
+django-cors-headers==4.3.1
 
-# Python version requirement
-# Python >= 3.7 required
+# Static files and media
+Pillow==10.1.0
 
-# Optional development dependencies
-# (uncomment if needed for development)
-# pytest>=7.0.0          # For unit testing
-# black>=22.0.0          # For code formatting
-# flake8>=4.0.0          # For code linting
-# mypy>=0.950            # For type checking
+# Development and debugging (optional)
+django-debug-toolbar==4.2.0

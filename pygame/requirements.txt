@@ -1,0 +1,18 @@
+# Retro Platform Fighter - Diamond Quest
+# Python package requirements
+
+# Core game engine
+pygame>=2.6.0
+
+# Sound generation and effects
+numpy>=1.20.0
+
+# Python version requirement
+# Python >= 3.7 required
+
+# Optional development dependencies
+# (uncomment if needed for development)
+# pytest>=7.0.0          # For unit testing
+# black>=22.0.0          # For code formatting
+# flake8>=4.0.0          # For code linting
+# mypy>=0.950            # For type checking

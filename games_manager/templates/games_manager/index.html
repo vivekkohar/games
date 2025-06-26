@@ -1,0 +1,71 @@
+{% extends 'games_manager/base.html' %}
+
+{% block title %}Retro Games Collection - Play Classic Games Online{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <div class="container">
+        <h1>Play Classic Retro Games Online</h1>
+        <p>Experience the nostalgia of classic arcade and console games, reimagined for the web. No downloads required!</p>
+    </div>
+</section>
+
+<section class="container">
+    <h2>Available Games</h2>
+    
+    <div class="games-grid">
+        {% if games %}
+            {% for game in games %}
+                <div class="game-card">
+                    {% if game.thumbnail %}
+                        <img src="{{ game.thumbnail.url }}" alt="{{ game.name }}" class="game-thumbnail">
+                    {% else %}
+                        <div class="game-thumbnail" style="background-color: #333; display: flex; justify-content: center; align-items: center; font-size: 48px;">
+                            🎮
+                        </div>
+                    {% endif %}
+                    <div class="game-info">
+                        <h3 class="game-title">{{ game.name }}</h3>
+                        <p class="game-description">{{ game.description|truncatewords:20 }}</p>
+                        <a href="/{{ game.url_path }}" class="btn">Play Now</a>
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <!-- Default games when no database entries exist -->
+            <div class="game-card">
+                <div class="game-thumbnail" style="background-color: #333; display: flex; justify-content: center; align-items: center; font-size: 48px;">
+                    🎮
+                </div>
+                <div class="game-info">
+                    <h3 class="game-title">Retro Platform Fighter</h3>
+                    <p class="game-description">A classic 2D platformer game with combat mechanics, diamond collection, and boss battles.</p>
+                    <a href="/retro_platform_fighter/" class="btn">Play Now</a>
+                </div>
+            </div>
+            
+            <div class="game-card">
+                <div class="game-thumbnail" style="background-color: #333; display: flex; justify-content: center; align-items: center; font-size: 48px;">
+                    🧩
+                </div>
+                <div class="game-info">
+                    <h3 class="game-title">Tetris</h3>
+                    <p class="game-description">The classic block-stacking puzzle game. Arrange falling blocks to create complete lines.</p>
+                    <a href="/tetris/" class="btn">Coming Soon</a>
+                </div>
+            </div>
+            
+            <div class="game-card">
+                <div class="game-thumbnail" style="background-color: #333; display: flex; justify-content: center; align-items: center; font-size: 48px;">
+                    🐍
+                </div>
+                <div class="game-info">
+                    <h3 class="game-title">Snake</h3>
+                    <p class="game-description">Control a growing snake, eat food, and avoid collisions in this classic arcade game.</p>
+                    <a href="/snake/" class="btn">Coming Soon</a>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}
