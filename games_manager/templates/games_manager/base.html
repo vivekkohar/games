@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %} Vishesh's Retro Games Collection{% endblock %}</title>
+    <title>{% block title %}Games Collection{% endblock %}</title>
     <style>
         :root {
             --primary-color: #4a6bff;
@@ -213,7 +213,7 @@
     <header>
         <div class="container">
             <a href="{% url 'games_manager:index' %}" class="logo">
-                🎮 <span>Vishesh's Retro Games Collection</span>
+                🎮 <span>Games Collection</span>
             </a>
             <nav>
                 <ul>
@@ -238,7 +238,7 @@
                 <a href="#">Terms of Service</a>
             </div>
             <div class="copyright">
-                &copy; {% now "Y" %} Retro Games Collection. All rights reserved.
+                &copy; {% now "Y" %} Games Collection. All rights reserved.
             </div>
         </div>
     </footer>
