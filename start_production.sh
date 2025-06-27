@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Production server startup script for Retro Games Collection
-echo "🚀 Starting Retro Games Collection Production Server..."
+# Simple production server startup script
+echo "🚀 Starting Retro Games Collection..."
 echo "===================================="
 
 # Get the directory where this script is located
@@ -11,58 +11,50 @@ cd "$SCRIPT_DIR"
 # Check if we're in the gamer conda environment
 if [ "$CONDA_DEFAULT_ENV" != "gamer" ]; then
     echo "⚠️  Not in 'gamer' conda environment."
-    echo "Please activate the environment first:"
-    echo "conda activate gamer"
+    echo "Please activate the environment first: conda activate gamer"
     exit 1
 fi
 
 # Check if .env file exists
 if [ ! -f ".env" ]; then
     echo "❌ .env file not found!"
-    echo "Please create .env file from .env.example and configure it for production."
+    echo "Please create .env file from .env.example"
     exit 1
 fi
 
-# Load environment variables
-export $(grep -v '^#' .env | xargs)
-
-# Validate required environment variables
-if [ -z "$SECRET_KEY" ]; then
-    echo "❌ SECRET_KEY not set in .env file"
-    exit 1
+# Load environment variables and show configuration
+if [ -f ".env" ]; then
+    export $(grep -v '^#' .env | xargs)
 fi
 
-if [ -z "$DATABASE_URL" ]; then
-    echo "❌ DATABASE_URL not set in .env file"
-    exit 1
-fi
-
-# Set production defaults
-export DEBUG=${DEBUG:-False}
-export WORKERS=${WORKERS:-3}
-export PORT=${PORT:-8000}
-export TIMEOUT=${TIMEOUT:-120}
+# Set defaults
+PORT=${PORT:-8000}
+DEBUG=${DEBUG:-False}
 
 echo "🔧 Configuration:"
-echo "   DEBUG: $DEBUG"
-echo "   WORKERS: $WORKERS"
-echo "   PORT: $PORT"
-echo "   TIMEOUT: $TIMEOUT"
+echo "   Workers: 1 (single worker)"
+echo "   Port: $PORT"
+echo "   Debug: $DEBUG"
+echo "   SSL Redirect: ${SECURE_SSL_REDIRECT:-False}"
 
-# Start Gunicorn server
+# Quick health check
 echo ""
-echo "🚀 Starting Gunicorn server..."
-echo "📱 Application will be available at: http://0.0.0.0:$PORT/"
-echo "🔧 Admin panel available at: http://0.0.0.0:$PORT/admin/"
+echo "🔍 Pre-flight checks:"
+python manage.py check --deploy --verbosity=0 && echo "   ✅ Django checks passed" || echo "   ⚠️  Django checks failed"
+
+echo ""
+echo "🚀 Starting server..."
+echo "📱 Application: http://localhost:$PORT/"
+echo "🔧 Admin panel: http://localhost:$PORT/admin/"
 echo ""
 echo "Press Ctrl+C to stop the server"
 echo "===================================="
 
-exec gunicorn retro_game_web.wsgi:application \
+# Start Gunicorn with single worker
+# Using application.py as WSGI entry point
+exec gunicorn application:application \
     --bind 0.0.0.0:$PORT \
-    --workers $WORKERS \
-    --timeout $TIMEOUT \
+    --workers 1 \
+    --timeout 60 \
     --access-logfile - \
-    --error-logfile - \
-    --log-level info \
-    --preload
+    --error-logfile -

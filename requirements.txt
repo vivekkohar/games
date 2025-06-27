@@ -12,14 +12,5 @@ whitenoise==6.6.0
 # Configuration
 python-decouple==3.8
 
-# Security and CORS
-django-cors-headers==4.3.1
-
 # Production server
 gunicorn==21.2.0
-
-# Monitoring and logging
-sentry-sdk[django]==1.40.0
-
-# Performance
-django-redis==5.4.0

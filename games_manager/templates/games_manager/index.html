@@ -27,7 +27,14 @@
                     <div class="game-info">
                         <h3 class="game-title">{{ game.name }}</h3>
                         <p class="game-description">{{ game.description|truncatewords:20 }}</p>
-                        <a href="/{{ game.url_path }}" class="btn">Play Now</a>
+                        <div class="game-buttons">
+                            {% if game.slug == 'retro-platform-fighter' %}
+                                <a href="{% url 'retro_platform_fighter:game' %}" class="btn">Play Now</a>
+                                <a href="{% url 'retro_platform_fighter:index' %}" class="btn btn-secondary">Game Info</a>
+                            {% else %}
+                                <a href="{{ game.url_path }}" class="btn">Play Now</a>
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
             {% endfor %}
@@ -40,7 +47,10 @@
                 <div class="game-info">
                     <h3 class="game-title">Retro Platform Fighter</h3>
                     <p class="game-description">A classic 2D platformer game with combat mechanics, diamond collection, and boss battles.</p>
-                    <a href="/retro_platform_fighter/" class="btn">Play Now</a>
+                    <div class="game-buttons">
+                        <a href="{% url 'retro_platform_fighter:game' %}" class="btn">Play Now</a>
+                        <a href="{% url 'retro_platform_fighter:index' %}" class="btn btn-secondary">Game Info</a>
+                    </div>
                 </div>
             </div>
             

@@ -65,7 +65,7 @@ Game.objects.create(
     name='Retro Platform Fighter',
     slug='retro-platform-fighter',
     description='A classic 2D platformer with combat mechanics',
-    url_path='/retro_platform_fighter/',
+    url_path='/retro_platform_fighter/play/',
     is_active=True
 )
 print('✅ Initial game entries created')
