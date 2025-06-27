@@ -16,9 +16,9 @@
             </div>
             
             <div class="game-controls">
-                <button class="btn" onclick="pauseGame()">⏸️ Pause</button>
-                <button class="btn" onclick="resetGame()">🔄 Reset</button>
-                <button class="btn" onclick="saveGame()">💾 Save</button>
+                <button class="btn" onclick="pauseGame()" id="pauseBtn">⏸️ Pause</button>
+                <button class="btn" onclick="resetGame()" id="resetBtn">🔄 Reset</button>
+                <button class="btn" onclick="saveGame()" id="saveBtn">💾 Save</button>
             </div>
         </div>
         
@@ -111,9 +111,103 @@ function getCookie(name) {
     return cookieValue;
 }
 
+// CSRF token for Django
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
 const csrftoken = getCookie('csrftoken');
 
+// Debug function to test API endpoints
+function testAPI() {
+    console.log('🧪 Testing API endpoints...');
+    
+    // Test high score submission
+    const testData = {
+        player_name: 'Test Player',
+        score: 1000,
+        level_reached: 3
+    };
+    
+    fetch('/retro_platform_fighter/api/submit-score/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrftoken
+        },
+        body: JSON.stringify(testData)
+    })
+    .then(response => {
+        console.log('API Response status:', response.status);
+        return response.json();
+    })
+    .then(data => {
+        console.log('API Response data:', data);
+    })
+    .catch(error => {
+        console.error('API Error:', error);
+    });
+}
+
+// Make testAPI available globally for debugging
+window.testAPI = testAPI;
+
 console.log('🎮 Game page loaded, initial state:', initialGameState);
+console.log('🔑 CSRF Token:', csrftoken);
+console.log('🧪 Run testAPI() in console to test API endpoints');
+
+// Test button functionality
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🔘 Testing button availability...');
+    
+    const pauseBtn = document.getElementById('pauseBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const saveBtn = document.getElementById('saveBtn');
+    
+    if (pauseBtn) {
+        console.log('✅ Pause button found');
+        pauseBtn.addEventListener('click', function() {
+            console.log('🔘 Pause button clicked via event listener');
+        });
+    } else {
+        console.error('❌ Pause button not found');
+    }
+    
+    if (resetBtn) {
+        console.log('✅ Reset button found');
+        resetBtn.addEventListener('click', function() {
+            console.log('🔘 Reset button clicked via event listener');
+        });
+    } else {
+        console.error('❌ Reset button not found');
+    }
+    
+    if (saveBtn) {
+        console.log('✅ Save button found');
+        saveBtn.addEventListener('click', function() {
+            console.log('🔘 Save button clicked via event listener');
+        });
+    } else {
+        console.error('❌ Save button not found');
+    }
+    
+    // Test if window functions are available
+    console.log('🔍 Testing window functions...');
+    console.log('pauseGame available:', typeof window.pauseGame);
+    console.log('resetGame available:', typeof window.resetGame);
+    console.log('saveGame available:', typeof window.saveGame);
+});
 </script>
 <script src="{% static 'retro_platform_fighter/js/game.js' %}"></script>
 {% endblock %}

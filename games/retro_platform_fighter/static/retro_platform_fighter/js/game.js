@@ -24,15 +24,19 @@ const COLORS = {
     CYAN: '#00FFFF',
     PURPLE: '#800080',
     ORANGE: '#FFA500',
-    SKY_BLUE: '#87CEEB'
+    SKY_BLUE: '#87CEEB',
+    GOLD: '#FFD700',
+    LIME: '#00FF00'
 };
 
 // Player constants
 const PLAYER_SPEED = 6;
 const JUMP_STRENGTH = -16;
+const SUPER_JUMP_STRENGTH = -22; // Enhanced jump with super diamond
 const GRAVITY = 0.8;
-const PUNCH_RANGE = 45;
-const KICK_RANGE = 55;
+const PUNCH_RANGE = 50; // Increased range
+const KICK_RANGE = 65; // Increased range
+const JUMP_DAMAGE = 30; // Damage when jumping on robots
 
 // Sound Manager for Web Audio API
 class SoundManager {
@@ -198,6 +202,7 @@ let player;
 let platforms = [];
 let robots = [];
 let diamonds = [];
+let superDiamonds = []; // New array for super diamonds
 let boss = null;
 let effects = [];
 
@@ -240,8 +245,17 @@ function initGame() {
             };
         }
         
-        // Set up game state
-        gameState = { ...initialGameState };
+        // Set up game state with power-ups
+        gameState = { 
+            ...initialGameState,
+            // Power-up states
+            superJumpActive: false,
+            superJumpTimer: 0,
+            superStrengthActive: false,
+            superStrengthTimer: 0,
+            invincibilityActive: false,
+            invincibilityTimer: 0
+        };
         console.log('✅ Game state initialized:', gameState);
         
         // Hide loading message
@@ -265,9 +279,9 @@ function initGame() {
         setupEventListeners();
         console.log('✅ Event listeners set up');
         
-        // Update UI
+        // Update UI and buttons
         console.log('🖥️ Updating UI...');
-        updateUI();
+        updateGameState();
         console.log('✅ UI updated');
         
         // Start game loop
@@ -321,11 +335,21 @@ class Player {
         this.attacking = false;
         this.attackType = '';
         this.attackTimer = 0;
+        
+        // Jump attack system
+        this.wasInAir = false;
+        this.jumpAttackCooldown = 0;
     }
     
     update() {
         // Handle input
         this.handleInput();
+        
+        // Update power-up timers
+        this.updatePowerUps();
+        
+        // Track if player was in air (for jump attacks)
+        this.wasInAir = !this.onGround;
         
         // Apply gravity
         this.velY += GRAVITY;
@@ -336,6 +360,16 @@ class Player {
         
         // Check platform collisions
         this.checkPlatformCollisions();
+        
+        // Check jump attacks on robots
+        if (this.wasInAir && this.onGround && this.jumpAttackCooldown <= 0) {
+            this.checkJumpAttacks();
+        }
+        
+        // Update jump attack cooldown
+        if (this.jumpAttackCooldown > 0) {
+            this.jumpAttackCooldown--;
+        }
         
         // Update invulnerability
         if (this.invulnerable) {
@@ -371,6 +405,75 @@ class Player {
         updateCamera();
     }
     
+    updatePowerUps() {
+        // Update super jump timer
+        if (gameState.superJumpActive) {
+            gameState.superJumpTimer--;
+            if (gameState.superJumpTimer <= 0) {
+                gameState.superJumpActive = false;
+                console.log('🦘 Super Jump power-up expired');
+            }
+        }
+        
+        // Update super strength timer
+        if (gameState.superStrengthActive) {
+            gameState.superStrengthTimer--;
+            if (gameState.superStrengthTimer <= 0) {
+                gameState.superStrengthActive = false;
+                console.log('💪 Super Strength power-up expired');
+            }
+        }
+        
+        // Update invincibility timer
+        if (gameState.invincibilityActive) {
+            gameState.invincibilityTimer--;
+            if (gameState.invincibilityTimer <= 0) {
+                gameState.invincibilityActive = false;
+                console.log('🛡️ Invincibility power-up expired');
+            }
+        }
+    }
+    
+    checkJumpAttacks() {
+        robots.forEach(robot => {
+            if (!robot.defeated && this.isOnTopOf(robot)) {
+                // Jump attack damage
+                const damage = gameState.superStrengthActive ? JUMP_DAMAGE * 2 : JUMP_DAMAGE;
+                robot.takeDamage(damage);
+                
+                // Bounce effect
+                this.velY = -8;
+                this.jumpAttackCooldown = 30; // Half second cooldown
+                
+                // Visual and audio feedback
+                createHitEffect(robot.x, robot.y - 20);
+                playSound('explosion');
+                
+                console.log(`🦘 Jump attack! Damage: ${damage}`);
+            }
+        });
+        
+        // Also check boss
+        if (boss && !boss.defeated && this.isOnTopOf(boss)) {
+            const damage = gameState.superStrengthActive ? JUMP_DAMAGE * 2 : JUMP_DAMAGE;
+            boss.takeDamage(damage);
+            this.velY = -8;
+            this.jumpAttackCooldown = 30;
+            createHitEffect(boss.x, boss.y - 20);
+            playSound('explosion');
+            console.log(`🦘 Jump attack on boss! Damage: ${damage}`);
+        }
+    }
+    
+    isOnTopOf(target) {
+        // Check if player is landing on top of target
+        return (this.x < target.x + target.width &&
+                this.x + this.width > target.x &&
+                this.y + this.height >= target.y &&
+                this.y + this.height <= target.y + 20 && // Small tolerance
+                this.velY > 0); // Player must be falling
+    }
+    
     handleInput() {
         this.velX = 0;
         
@@ -384,11 +487,16 @@ class Player {
             this.facing = 1;
         }
         
-        // Jumping
+        // Jumping with super jump support
         if ((keys['ArrowUp'] || keys['KeyW'] || keys['Space']) && this.onGround) {
-            this.velY = JUMP_STRENGTH;
+            const jumpStrength = gameState.superJumpActive ? SUPER_JUMP_STRENGTH : JUMP_STRENGTH;
+            this.velY = jumpStrength;
             this.onGround = false;
             playSound('jump');
+            
+            if (gameState.superJumpActive) {
+                console.log('🦘 Super Jump activated!');
+            }
         }
         
         // Attacks
@@ -407,34 +515,59 @@ class Player {
         this.attackType = type;
         this.attackTimer = 20;
         
-        // Check for hits on robots and boss
+        // Enhanced damage with super strength
+        const baseDamage = type === 'punch' ? 15 : 25;
+        const damage = gameState.superStrengthActive ? baseDamage * 2 : baseDamage;
         const range = type === 'punch' ? PUNCH_RANGE : KICK_RANGE;
-        const damage = type === 'punch' ? 15 : 25;
         
-        // Check robot hits
+        console.log(`🥊 ${type} attack! Damage: ${damage}, Range: ${range}`);
+        
+        // Check robot hits with improved detection
+        let hitCount = 0;
         robots.forEach(robot => {
-            if (!robot.defeated && this.isInRange(robot, range)) {
+            if (!robot.defeated && this.isInAttackRange(robot, range)) {
                 robot.takeDamage(damage);
                 createHitEffect(robot.x, robot.y);
+                hitCount++;
+                console.log(`🎯 Hit robot at (${robot.x}, ${robot.y})`);
             }
         });
         
         // Check boss hits
-        if (boss && !boss.defeated && this.isInRange(boss, range)) {
+        if (boss && !boss.defeated && this.isInAttackRange(boss, range)) {
             boss.takeDamage(damage);
             createHitEffect(boss.x, boss.y);
+            hitCount++;
+            console.log(`🎯 Hit boss at (${boss.x}, ${boss.y})`);
+        }
+        
+        if (hitCount === 0) {
+            console.log('❌ Attack missed - no targets in range');
         }
     }
     
-    isInRange(target, range) {
-        const dx = target.x - this.x;
-        const dy = target.y - this.y;
+    isInAttackRange(target, range) {
+        // Improved hit detection
+        const playerCenterX = this.x + this.width / 2;
+        const playerCenterY = this.y + this.height / 2;
+        const targetCenterX = target.x + target.width / 2;
+        const targetCenterY = target.y + target.height / 2;
+        
+        const dx = targetCenterX - playerCenterX;
+        const dy = targetCenterY - playerCenterY;
         const distance = Math.sqrt(dx * dx + dy * dy);
         
-        // Check if target is in front of player
-        const inFront = (this.facing === 1 && dx > 0) || (this.facing === -1 && dx < 0);
+        // Check if target is in front of player (more lenient)
+        const inFront = (this.facing === 1 && dx > -10) || (this.facing === -1 && dx < 10);
         
-        return distance <= range && inFront;
+        // Check vertical alignment (more lenient)
+        const verticallyAligned = Math.abs(dy) < 40;
+        
+        const inRange = distance <= range;
+        
+        console.log(`🎯 Attack check: distance=${distance.toFixed(1)}, range=${range}, inFront=${inFront}, verticallyAligned=${verticallyAligned}`);
+        
+        return inRange && inFront && verticallyAligned;
     }
     
     checkPlatformCollisions() {
@@ -475,6 +608,12 @@ class Player {
     }
     
     takeDamage(amount) {
+        // Check for invincibility power-up
+        if (gameState.invincibilityActive) {
+            console.log('🛡️ Damage blocked by invincibility!');
+            return;
+        }
+        
         if (!this.invulnerable) {
             gameState.diamonds -= amount;
             this.health = gameState.diamonds;
@@ -511,7 +650,23 @@ class Player {
     draw() {
         ctx.save();
         
-        // Flicker when invulnerable
+        // Power-up visual effects
+        if (gameState.invincibilityActive) {
+            // Golden glow for invincibility
+            ctx.shadowColor = COLORS.GOLD;
+            ctx.shadowBlur = 15;
+            ctx.globalAlpha = 0.8 + 0.2 * Math.sin(Date.now() / 100);
+        } else if (gameState.superStrengthActive) {
+            // Red glow for super strength
+            ctx.shadowColor = COLORS.RED;
+            ctx.shadowBlur = 10;
+        } else if (gameState.superJumpActive) {
+            // Blue glow for super jump
+            ctx.shadowColor = COLORS.BLUE;
+            ctx.shadowBlur = 10;
+        }
+        
+        // Flicker when invulnerable (from damage)
         if (this.invulnerable && Math.floor(this.invulnerableTime / 5) % 2) {
             ctx.globalAlpha = 0.5;
         }
@@ -1013,7 +1168,147 @@ class Boss {
     }
 }
 
-// Diamond class
+// Super Diamond class
+class SuperDiamond {
+    constructor(x, y, type = 'jump') {
+        this.x = x;
+        this.y = y;
+        this.width = 30;
+        this.height = 30;
+        this.collected = false;
+        this.animationFrame = 0;
+        this.sparkleTimer = 0;
+        this.type = type; // 'jump', 'strength', 'invincibility'
+        this.pulseTimer = 0;
+        
+        // Type-specific properties
+        this.colors = {
+            jump: { primary: COLORS.BLUE, secondary: COLORS.CYAN },
+            strength: { primary: COLORS.RED, secondary: COLORS.ORANGE },
+            invincibility: { primary: COLORS.GOLD, secondary: COLORS.YELLOW }
+        };
+    }
+    
+    update() {
+        if (this.collected) return;
+        
+        // Animation
+        this.animationFrame += 0.1;
+        this.sparkleTimer++;
+        this.pulseTimer += 0.15;
+        
+        // Check collision with player
+        if (this.x < player.x + player.width &&
+            this.x + this.width > player.x &&
+            this.y < player.y + player.height &&
+            this.y + this.height > player.y) {
+            
+            this.collected = true;
+            this.activatePowerUp();
+            gameState.score += 50; // More points than regular diamonds
+            playSound('diamondCollect');
+            updateUI();
+            createSparkleEffect(this.x, this.y);
+        }
+    }
+    
+    activatePowerUp() {
+        const duration = 600; // 10 seconds at 60 FPS
+        
+        switch (this.type) {
+            case 'jump':
+                gameState.superJumpActive = true;
+                gameState.superJumpTimer = duration;
+                console.log('🦘 Super Jump activated for 10 seconds!');
+                showPowerUpMessage('🦘 Super Jump!', 'Higher jumps for 10 seconds!');
+                break;
+                
+            case 'strength':
+                gameState.superStrengthActive = true;
+                gameState.superStrengthTimer = duration;
+                console.log('💪 Super Strength activated for 10 seconds!');
+                showPowerUpMessage('💪 Super Strength!', 'Double damage for 10 seconds!');
+                break;
+                
+            case 'invincibility':
+                gameState.invincibilityActive = true;
+                gameState.invincibilityTimer = duration;
+                console.log('🛡️ Invincibility activated for 10 seconds!');
+                showPowerUpMessage('🛡️ Invincibility!', 'No damage for 10 seconds!');
+                break;
+        }
+    }
+    
+    draw() {
+        if (this.collected) return;
+        
+        ctx.save();
+        
+        // Pulsing effect
+        const pulse = 1 + 0.2 * Math.sin(this.pulseTimer);
+        const centerX = this.x - camera.x + this.width/2;
+        const centerY = this.y - camera.y + this.height/2;
+        
+        // Rotate diamond
+        ctx.translate(centerX, centerY);
+        ctx.rotate(this.animationFrame);
+        ctx.scale(pulse, pulse);
+        
+        // Draw outer glow
+        const colors = this.colors[this.type];
+        ctx.shadowColor = colors.secondary;
+        ctx.shadowBlur = 20;
+        
+        // Draw super diamond (larger than regular)
+        ctx.fillStyle = colors.primary;
+        ctx.beginPath();
+        ctx.moveTo(0, -15);
+        ctx.lineTo(12, 0);
+        ctx.lineTo(0, 15);
+        ctx.lineTo(-12, 0);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Draw inner highlight
+        ctx.fillStyle = colors.secondary;
+        ctx.beginPath();
+        ctx.moveTo(0, -10);
+        ctx.lineTo(8, 0);
+        ctx.lineTo(0, 10);
+        ctx.lineTo(-8, 0);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Draw outline
+        ctx.strokeStyle = COLORS.WHITE;
+        ctx.lineWidth = 3;
+        ctx.shadowBlur = 0;
+        ctx.beginPath();
+        ctx.moveTo(0, -15);
+        ctx.lineTo(12, 0);
+        ctx.lineTo(0, 15);
+        ctx.lineTo(-12, 0);
+        ctx.closePath();
+        ctx.stroke();
+        
+        ctx.restore();
+        
+        // Enhanced sparkle effect
+        if (this.sparkleTimer % 20 < 10) {
+            const sparkles = [
+                { x: this.x - camera.x + 5, y: this.y - camera.y - 8 },
+                { x: this.x - camera.x + 25, y: this.y - camera.y + 8 },
+                { x: this.x - camera.x - 5, y: this.y - camera.y + 25 },
+                { x: this.x - camera.x + 20, y: this.y - camera.y - 5 }
+            ];
+            
+            ctx.fillStyle = COLORS.WHITE;
+            sparkles.forEach(sparkle => {
+                ctx.fillRect(sparkle.x, sparkle.y, 3, 3);
+            });
+        }
+    }
+}
 class Diamond {
     constructor(x, y) {
         this.x = x;
@@ -1170,6 +1465,7 @@ function initLevel(levelNum) {
     platforms = [];
     robots = [];
     diamonds = [];
+    superDiamonds = []; // Clear super diamonds
     boss = null;
     effects = [];
     
@@ -1177,6 +1473,7 @@ function initLevel(levelNum) {
     createPlatforms(levelNum);
     createRobots(levelNum);
     createDiamonds(levelNum);
+    createSuperDiamonds(levelNum); // Create super diamonds
     createBoss(levelNum);
 }
 
@@ -1267,6 +1564,24 @@ function createDiamonds(level) {
     }
 }
 
+function createSuperDiamonds(level) {
+    // Create 1-3 super diamonds per level
+    const superDiamondCount = Math.min(3, Math.floor(level / 2) + 1);
+    const types = ['jump', 'strength', 'invincibility'];
+    
+    for (let i = 0; i < superDiamondCount; i++) {
+        // Place super diamonds on platforms for easier access
+        const platform = platforms[Math.floor(Math.random() * Math.min(platforms.length, 10))];
+        if (platform && platform.y < SCREEN_HEIGHT - 100) {
+            const x = platform.x + Math.random() * (platform.width - 30);
+            const y = platform.y - 40;
+            const type = types[i % types.length];
+            superDiamonds.push(new SuperDiamond(x, y, type));
+            console.log(`🌟 Created ${type} super diamond at (${x.toFixed(0)}, ${y.toFixed(0)})`);
+        }
+    }
+}
+
 function createBoss(level) {
     const bossX = WORLD_WIDTH - 200;
     const bossY = SCREEN_HEIGHT - 130;
@@ -1323,6 +1638,9 @@ function update() {
     // Update diamonds
     diamonds.forEach(diamond => diamond.update());
     
+    // Update super diamonds
+    superDiamonds.forEach(superDiamond => superDiamond.update());
+    
     // Update effects
     effects = effects.filter(effect => effect.update());
     
@@ -1340,6 +1658,9 @@ function draw() {
     
     // Draw diamonds
     diamonds.forEach(diamond => diamond.draw());
+    
+    // Draw super diamonds
+    superDiamonds.forEach(superDiamond => superDiamond.draw());
     
     // Draw robots
     robots.forEach(robot => robot.draw());
@@ -1376,19 +1697,85 @@ function drawUI() {
         ctx.fillText('All robots defeated! Find the boss!', 20, 30);
     }
     
+    // Draw power-up status
+    let powerUpY = 50;
+    if (gameState.superJumpActive) {
+        const timeLeft = Math.ceil(gameState.superJumpTimer / 60);
+        ctx.fillStyle = COLORS.BLUE;
+        ctx.font = '14px monospace';
+        ctx.fillText(`🦘 Super Jump: ${timeLeft}s`, 20, powerUpY);
+        powerUpY += 20;
+    }
+    if (gameState.superStrengthActive) {
+        const timeLeft = Math.ceil(gameState.superStrengthTimer / 60);
+        ctx.fillStyle = COLORS.RED;
+        ctx.font = '14px monospace';
+        ctx.fillText(`💪 Super Strength: ${timeLeft}s`, 20, powerUpY);
+        powerUpY += 20;
+    }
+    if (gameState.invincibilityActive) {
+        const timeLeft = Math.ceil(gameState.invincibilityTimer / 60);
+        ctx.fillStyle = COLORS.GOLD;
+        ctx.font = '14px monospace';
+        ctx.fillText(`🛡️ Invincibility: ${timeLeft}s`, 20, powerUpY);
+        powerUpY += 20;
+    }
+    
     // Draw controls hint
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    ctx.fillRect(20, SCREEN_HEIGHT - 80, 300, 60);
+    ctx.fillRect(20, SCREEN_HEIGHT - 100, 350, 80);
     
     ctx.fillStyle = COLORS.WHITE;
     ctx.font = '12px monospace';
     ctx.textAlign = 'left';
-    ctx.fillText('WASD/Arrows: Move  Space: Jump', 30, SCREEN_HEIGHT - 60);
-    ctx.fillText('X: Punch  Z: Kick  ESC: Pause', 30, SCREEN_HEIGHT - 45);
-    ctx.fillText('Collect diamonds, defeat all robots!', 30, SCREEN_HEIGHT - 30);
+    ctx.fillText('WASD/Arrows: Move  Space: Jump', 30, SCREEN_HEIGHT - 80);
+    ctx.fillText('X: Punch  Z: Kick  ESC: Pause', 30, SCREEN_HEIGHT - 65);
+    ctx.fillText('Jump on robots for damage!', 30, SCREEN_HEIGHT - 50);
+    ctx.fillText('Collect super diamonds for power-ups!', 30, SCREEN_HEIGHT - 35);
 }
 
-// Event handlers
+// Power-up message system
+function showPowerUpMessage(title, description) {
+    // Create a temporary message effect
+    const messageEffect = {
+        x: SCREEN_WIDTH / 2,
+        y: SCREEN_HEIGHT / 2 - 100,
+        title: title,
+        description: description,
+        timer: 180, // 3 seconds
+        maxTimer: 180,
+        
+        update() {
+            this.timer--;
+            return this.timer > 0;
+        },
+        
+        draw() {
+            const alpha = this.timer / this.maxTimer;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            
+            // Background
+            ctx.fillStyle = 'rgba(0,0,0,0.8)';
+            ctx.fillRect(this.x - 200, this.y - 40, 400, 80);
+            
+            // Title
+            ctx.fillStyle = COLORS.GOLD;
+            ctx.font = 'bold 24px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(this.title, this.x, this.y - 10);
+            
+            // Description
+            ctx.fillStyle = COLORS.WHITE;
+            ctx.font = '16px monospace';
+            ctx.fillText(this.description, this.x, this.y + 15);
+            
+            ctx.restore();
+        }
+    };
+    
+    effects.push(messageEffect);
+}
 function setupEventListeners() {
     // Keyboard events
     document.addEventListener('keydown', (e) => {
@@ -1467,7 +1854,18 @@ function gameOver() {
 }
 
 function togglePause() {
+    console.log('⏸️ Toggle pause called, current state - gamePaused:', gamePaused, 'gameRunning:', gameRunning);
+    
+    if (!gameRunning) {
+        console.log('⚠️ Cannot toggle pause - game not running');
+        return;
+    }
+    
     gamePaused = !gamePaused;
+    console.log('⏸️ Pause state changed to:', gamePaused);
+    
+    // Update button states
+    updateButtonStates();
     
     if (gamePaused) {
         showMessage('⏸️ Game Paused', 
@@ -1512,38 +1910,7 @@ function hideMessage() {
     document.getElementById('gameMessage').style.display = 'none';
 }
 
-// API functions
-function saveGame() {
-    const data = {
-        level: gameState.level,
-        diamonds: gameState.diamonds,
-        lives: gameState.lives,
-        score: gameState.score,
-        player_x: player.x,
-        player_y: player.y,
-        robots_defeated: robots.map((robot, index) => robot.defeated ? index : null).filter(x => x !== null),
-        diamonds_collected: diamonds.map((diamond, index) => diamond.collected ? index : null).filter(x => x !== null),
-        boss_defeated: boss ? boss.defeated : false,
-        level_completed: false
-    };
-    
-    fetch('/api/save-state/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': csrftoken
-        },
-        body: JSON.stringify(data)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showMessage('💾 Game Saved', 'Your progress has been saved!', 
-                       [{ text: 'Continue', action: hideMessage }]);
-        }
-    })
-    .catch(error => console.error('Save error:', error));
-}
+// API functions (saveGame function moved to window.saveGame below)
 
 function saveGameState() {
     // Auto-save without showing message
@@ -1556,7 +1923,7 @@ function saveGameState() {
         player_y: player.y
     };
     
-    fetch('/api/save-state/', {
+    fetch('/retro_platform_fighter/api/save-state/', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -1577,7 +1944,7 @@ function submitHighScore() {
         level_reached: gameState.level
     };
     
-    fetch('/api/submit-score/', {
+    fetch('/retro_platform_fighter/api/submit-score/', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -1591,16 +1958,31 @@ function submitHighScore() {
             showMessage('🏆 Score Submitted!', 
                        `Your rank: #${data.rank}`, 
                        [
-                           { text: 'View Leaderboard', action: () => window.location.href = '/leaderboard/' },
+                           { text: 'View Leaderboard', action: () => window.location.href = '/retro_platform_fighter/leaderboard/' },
                            { text: 'Play Again', action: () => { resetGame(); hideMessage(); } }
+                       ]);
+        } else {
+            showMessage('❌ Submission Failed', 
+                       data.error || 'Failed to submit score', 
+                       [
+                           { text: 'Try Again', action: submitHighScore },
+                           { text: 'Continue', action: hideMessage }
                        ]);
         }
     })
-    .catch(error => console.error('Score submission error:', error));
+    .catch(error => {
+        console.error('Score submission error:', error);
+        showMessage('❌ Network Error', 
+                   'Failed to connect to server', 
+                   [
+                       { text: 'Try Again', action: submitHighScore },
+                       { text: 'Continue', action: hideMessage }
+                   ]);
+    });
 }
 
 function resetGame() {
-    fetch('/api/reset-game/', {
+    fetch('/retro_platform_fighter/api/reset-game/', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -1618,7 +2000,7 @@ function resetGame() {
             playerY: 500
         };
         
-        updateUI();
+        updateGameState();
         initLevel(1);
         gameRunning = true;
         gamePaused = false;
@@ -1626,10 +2008,7 @@ function resetGame() {
     .catch(error => console.error('Reset error:', error));
 }
 
-// Button handlers for UI
-function pauseGame() {
-    togglePause();
-}
+// Button handlers for UI (removed duplicate - using window.pauseGame below)
 
 // Initialize game when page loads
 document.addEventListener('DOMContentLoaded', () => {
@@ -1674,31 +2053,65 @@ window.addEventListener('resize', () => {
 
 // Game control functions for UI buttons
 window.pauseGame = function() {
+    console.log('🎮 Pause button clicked, gameRunning:', gameRunning, 'gamePaused:', gamePaused);
     if (gameRunning) {
         togglePause();
+    } else {
+        console.log('⚠️ Cannot pause - game not running');
+        showMessage('Cannot Pause', 'Game is not currently running.', [
+            { text: 'OK', action: () => hideMessage() }
+        ]);
     }
 };
 
 window.resetGame = function() {
+    console.log('🔄 Reset button clicked');
+    
     if (confirm('Are you sure you want to restart the game? All progress will be lost.')) {
+        console.log('🔄 User confirmed reset');
+        
         // Reset game state
         gameState = { ...initialGameState };
+        console.log('🔄 Game state reset to:', gameState);
         
         // Reinitialize game
-        initPlayer();
-        initLevel(gameState.level);
-        updateUI();
-        
-        // Unpause if paused
-        if (gamePaused) {
-            togglePause();
+        try {
+            initPlayer();
+            initLevel(gameState.level);
+            updateGameState();
+            
+            // Unpause if paused
+            if (gamePaused) {
+                gamePaused = false;
+                hideMessage();
+            }
+            
+            // Ensure game is running
+            gameRunning = true;
+            
+            console.log('🔄 Game reset successfully');
+        } catch (error) {
+            console.error('❌ Error during game reset:', error);
+            showMessage('Reset Error', 'Failed to reset the game. Please refresh the page.', [
+                { text: 'OK', action: () => hideMessage() }
+            ]);
         }
-        
-        console.log('🔄 Game reset');
+    } else {
+        console.log('🔄 User cancelled reset');
     }
 };
 
 window.saveGame = function() {
+    console.log('💾 Save button clicked, gameRunning:', gameRunning);
+    
+    if (!gameRunning) {
+        console.log('⚠️ Cannot save - game not running');
+        showMessage('Cannot Save', 'Game is not currently running.', [
+            { text: 'OK', action: () => hideMessage() }
+        ]);
+        return;
+    }
+    
     // Save game state to server
     const gameData = {
         level: gameState.level,
@@ -1707,13 +2120,15 @@ window.saveGame = function() {
         score: gameState.score,
         playerX: player ? player.x : gameState.playerX,
         playerY: player ? player.y : gameState.playerY,
-        robotsDefeated: gameState.robotsDefeated,
-        diamondsCollected: gameState.diamondsCollected,
-        bossDefeated: gameState.bossDefeated,
-        levelCompleted: gameState.levelCompleted
+        robotsDefeated: gameState.robotsDefeated || [],
+        diamondsCollected: gameState.diamondsCollected || [],
+        bossDefeated: gameState.bossDefeated || false,
+        levelCompleted: gameState.levelCompleted || false
     };
     
-    fetch('/api/save-state/', {
+    console.log('💾 Saving game data:', gameData);
+    
+    fetch('/retro_platform_fighter/api/save-state/', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -1721,8 +2136,12 @@ window.saveGame = function() {
         },
         body: JSON.stringify(gameData)
     })
-    .then(response => response.json())
+    .then(response => {
+        console.log('💾 Save response status:', response.status);
+        return response.json();
+    })
     .then(data => {
+        console.log('💾 Save response data:', data);
         if (data.success) {
             console.log('✅ Game saved successfully');
             showMessage('Game Saved', 'Your progress has been saved!', [
@@ -1748,6 +2167,32 @@ window.startGame = function() {
     console.log('🎮 Manual game start triggered');
     initGame();
 };
+
+// Button state management
+function updateButtonStates() {
+    const pauseBtn = document.getElementById('pauseBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const saveBtn = document.getElementById('saveBtn');
+    
+    if (pauseBtn) {
+        pauseBtn.disabled = !gameRunning;
+        pauseBtn.textContent = gamePaused ? '▶️ Resume' : '⏸️ Pause';
+    }
+    
+    if (resetBtn) {
+        resetBtn.disabled = false; // Reset should always be available
+    }
+    
+    if (saveBtn) {
+        saveBtn.disabled = !gameRunning;
+    }
+}
+
+// Call updateButtonStates when game state changes
+function updateGameState() {
+    updateUI();
+    updateButtonStates();
+}
 
 // Debug function to check game state
 window.debugGame = function() {
