@@ -32,8 +32,10 @@ const COLORS = {
 // Player constants
 const PLAYER_SPEED = 6;
 const JUMP_STRENGTH = -16;
-const SUPER_JUMP_STRENGTH = -22; // Enhanced jump with super diamond
-const GRAVITY = 0.8;
+const SUPER_JUMP_STRENGTH = -28; // Enhanced jump with super diamond (increased from -22)
+const SUPER_JUMP_GRAVITY = 0.5; // Reduced gravity during super jump
+const NORMAL_GRAVITY = 0.8;
+const GRAVITY = NORMAL_GRAVITY;
 const PUNCH_RANGE = 50; // Increased range
 const KICK_RANGE = 65; // Increased range
 const JUMP_DAMAGE = 30; // Damage when jumping on robots
@@ -348,6 +350,9 @@ class Player {
         // Update power-up timers
         this.updatePowerUps();
         
+        // Apply gravity based on power-up state
+        GRAVITY = gameState.superJumpActive ? SUPER_JUMP_GRAVITY : NORMAL_GRAVITY;
+        
         // Track if player was in air (for jump attacks)
         this.wasInAir = !this.onGround;
         
@@ -361,8 +366,8 @@ class Player {
         // Check platform collisions
         this.checkPlatformCollisions();
         
-        // Check jump attacks on robots
-        if (this.wasInAir && this.onGround && this.jumpAttackCooldown <= 0) {
+        // Check jump attacks on robots - check every frame while in air
+        if (this.wasInAir && this.jumpAttackCooldown <= 0) {
             this.checkJumpAttacks();
         }
         
@@ -434,50 +439,81 @@ class Player {
         }
     }
     
-    checkJumpAttacks() {
-        robots.forEach(robot => {
-            if (!robot.defeated && this.isOnTopOf(robot)) {
-                // Jump attack damage
-                const damage = gameState.superStrengthActive ? JUMP_DAMAGE * 2 : JUMP_DAMAGE;
-                robot.takeDamage(damage);
-                
-                // Bounce effect
-                this.velY = -8;
-                this.jumpAttackCooldown = 30; // Half second cooldown
-                
-                // Visual and audio feedback
-                createHitEffect(robot.x, robot.y - 20);
-                playSound('explosion');
-                
-                console.log(`🦘 Jump attack! Damage: ${damage}`);
+    createShockwave() {
+        // Create a shockwave effect that damages nearby enemies
+        const shockwaveRadius = 150;
+        const shockwaveDamage = 40;
+        
+        // Visual effect
+        createExplosionEffect(this.x + this.width/2, this.y + this.height/2, shockwaveRadius/2);
+        
+        // Damage all nearby enemies
+        [...robots, boss].forEach(enemy => {
+            if (!enemy || enemy.defeated) return;
+            
+            const dx = (enemy.x + enemy.width/2) - (this.x + this.width/2);
+            const dy = (enemy.y + enemy.height/2) - (this.y + this.height/2);
+            const distance = Math.sqrt(dx*dx + dy*dy);
+            
+            if (distance < shockwaveRadius) {
+                enemy.takeDamage(shockwaveDamage);
+                // Knockback effect
+                enemy.x += (dx / distance) * 10;
+                enemy.y -= 5; // Slight upward knockback
             }
         });
         
-        // Also check boss
-        if (boss && !boss.defeated && this.isOnTopOf(boss)) {
-            const damage = gameState.superStrengthActive ? JUMP_DAMAGE * 2 : JUMP_DAMAGE;
-            boss.takeDamage(damage);
-            this.velY = -8;
-            this.jumpAttackCooldown = 30;
-            createHitEffect(boss.x, boss.y - 20);
-            playSound('explosion');
-            console.log(`🦘 Jump attack on boss! Damage: ${damage}`);
-        }
+        playSound('explosion');
     }
     
-    isOnTopOf(target) {
-        // Check if player is landing on top of target with better collision detection
-        const playerBottom = this.y + this.height;
-        const targetTop = target.y;
-        const playerMiddleX = this.x + this.width / 2;
-        
-        return (
-            playerBottom >= targetTop - 5 && // Slightly above the top
-            playerBottom <= targetTop + 20 && // Small tolerance
-            playerMiddleX > target.x && // Within target's width
-            playerMiddleX < target.x + target.width &&
-            this.velY > 0 // Player must be falling
-        );
+    checkJumpAttacks() {
+        // First check robots
+        let foundAttack = false;
+        for (let i = 0; i < robots.length; i++) {
+            const robot = robots[i];
+            if (!robot.defeated && this.isOnTopOf(robot)) {
+                foundAttack = true;
+                console.log(`🦘 Attempting jump attack on robot at (${robot.x},${robot.y})`);
+                // Enhanced jump attack damage with super strength
+                const baseJumpDamage = JUMP_DAMAGE * (gameState.superStrengthActive ? 3 : 1);
+                const damage = baseJumpDamage + (this.velY > 0 ? Math.abs(this.velY) * 2 : 0); // Bonus for falling speed
+
+                // Apply damage
+                robot.takeDamage(damage);
+                console.log(`🤖 Robot HP after jump: ${robot.health}`);
+
+                // Bounce effect - stronger if falling fast
+                const bounceStrength = Math.min(Math.abs(this.velY) * 0.8, 15);
+                this.velY = -bounceStrength;
+                this.jumpAttackCooldown = 15; // Shorter cooldown for faster gameplay
+
+                // Visual and audio feedback
+                createHitEffect(robot.x + robot.width/2, robot.y - 10);
+                playSound('explosion');
+
+                console.log(`🦘 Jump attack! Damage: ${damage} (velY: ${this.velY.toFixed(1)})`);
+
+                // Only process one robot per frame to avoid multiple bounces
+                break;
+            }
+        }
+
+        // Then check boss
+        if (boss && !boss.defeated && this.isOnTopOf(boss)) {
+            const baseJumpDamage = JUMP_DAMAGE * 1.5 * (gameState.superStrengthActive ? 3 : 1);
+            const damage = baseJumpDamage + (this.velY > 0 ? Math.abs(this.velY) * 2 : 0);
+
+            boss.takeDamage(damage);
+
+            // Bounce higher off boss
+            const bounceStrength = Math.min(Math.abs(this.velY) * 0.9, 18);
+            this.velY = -bounceStrength;
+            this.jumpAttackCooldown = 20;
+
+            createHitEffect(boss.x + boss.width/2, boss.y - 20);
+            playSound('explosion');
+            console.log(`🦘 Jump attack on boss! Damage: ${damage} (velY: ${this.velY.toFixed(1)})`);
+        }
     }
     
     handleInput() {
@@ -522,8 +558,13 @@ class Player {
         this.attackTimer = 20;
         
         // Enhanced damage with super strength
-        const baseDamage = type === 'punch' ? 15 : 25;
-        const damage = gameState.superStrengthActive ? baseDamage * 2 : baseDamage;
+        const baseDamage = type === 'punch' ? 20 : 30; // Increased base damage
+        const damage = gameState.superStrengthActive ? Math.floor(baseDamage * 2.5) : baseDamage; // 2.5x damage instead of 2x
+        
+        // Shockwave effect for super strength attacks
+        if (gameState.superStrengthActive) {
+            this.createShockwave();
+        }
         const range = type === 'punch' ? PUNCH_RANGE : KICK_RANGE;
         
         console.log(`🥊 ${type} attack! Damage: ${damage}, Range: ${range}`);
@@ -549,20 +590,6 @@ class Player {
         
         if (hitCount === 0) {
             console.log('❌ Attack missed - no targets in range');
-        }
-    }
-    
-    isInAttackRange(target, range) {
-        // Improved hit detection
-        const playerCenterX = this.x + this.width / 2;
-        const playerCenterY = this.y + this.height / 2;
-        const targetCenterX = target.x + target.width / 2;
-        const targetCenterY = target.y + target.height / 2;
-        
-        const dx = targetCenterX - playerCenterX;
-        const dy = targetCenterY - playerCenterY;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        
         // Check if target is in front of player (more lenient)
         const inFront = (this.facing === 1 && dx > -10) || (this.facing === -1 && dx < 10);
         
@@ -614,9 +641,14 @@ class Player {
     }
     
     takeDamage(amount) {
-        // Check for invincibility power-up
+        // Check for invincibility
         if (gameState.invincibilityActive) {
             console.log('🛡️ Damage blocked by invincibility!');
+            createHitEffect(this.x, this.y - 20);
+            playSound('block');
+            
+            // Shockwave effect when hit while invincible
+            this.createShockwave();
             return;
         }
         
@@ -834,11 +866,36 @@ class Player {
         
         ctx.restore();
     }
+    
+    // Add this method to the Player class
+    isOnTopOf(target) {
+        // Check if player is falling
+        if (this.velY <= 0) return false;
+        // Calculate player and target bounds
+        const playerBottom = this.y + this.height;
+        const playerTop = this.y;
+        const targetTop = target.y;
+        const targetBottom = target.y + target.height;
+        const targetLeft = target.x;
+        const targetRight = target.x + target.width;
+        // Check horizontal overlap
+        const horizontalOverlap = this.x + this.width > targetLeft + 8 && this.x < targetRight - 8;
+        // Check if player's bottom is above the top half of the target and within a small margin
+        const verticalCondition = playerBottom > targetTop && playerTop < targetTop && playerBottom < targetTop + target.height * 0.6;
+        return horizontalOverlap && verticalCondition;
+    }
 }
 
 // Initialize player
 function initPlayer() {
-    player = new Player(gameState.playerX, gameState.playerY);
+    try {
+        console.log('👤 Initializing player at:', gameState.playerX, gameState.playerY);
+        player = new Player(gameState.playerX, gameState.playerY);
+        console.log('✅ Player initialized:', player);
+    } catch (error) {
+        console.error('❌ Error initializing player:', error);
+        throw error; // Re-throw to be caught by the caller
+    }
 }
 
 // Platform class
@@ -915,21 +972,26 @@ class Robot {
         // Update position
         this.x += moveX;
         this.y += this.velY;
-        
+
         // Check platform collisions
         this.checkPlatformCollisions();
-        
-        // Attack player if close
-        if (distanceToPlayer < 40 && this.attackCooldown <= 0) {
+
+        // Attack player only if colliding (AABB)
+        const collidesWithPlayer =
+            this.x < player.x + player.width &&
+            this.x + this.width > player.x &&
+            this.y < player.y + player.height &&
+            this.y + this.height > player.y;
+        if (collidesWithPlayer && this.attackCooldown <= 0) {
             player.takeDamage(5);
             this.attackCooldown = 60; // 1 second cooldown
             playSound('robotHit');
         }
-        
+
         if (this.attackCooldown > 0) {
             this.attackCooldown--;
         }
-        
+
         // Keep in world bounds
         this.x = Math.max(0, Math.min(WORLD_WIDTH - this.width, this.x));
     }
@@ -1200,8 +1262,8 @@ class SuperDiamond {
     constructor(x, y, type = 'jump') {
         this.x = x;
         this.y = y;
-        this.width = 30;
-        this.height = 30;
+        this.width = 50; // Increased size
+        this.height = 50; // Increased size
         this.collected = false;
         this.animationFrame = 0;
         this.sparkleTimer = 0;
@@ -1285,23 +1347,33 @@ class SuperDiamond {
         ctx.save();
         
         // Enhanced pulsing effect
-        const pulse = 1 + 0.3 * Math.sin(this.pulseTimer);
+        const pulse = 1.2 + 0.5 * Math.sin(this.pulseTimer); // More dramatic pulse
         const centerX = this.x - camera.x + this.width/2;
         const centerY = this.y - camera.y + this.height/2;
         
         // Draw outer glow
         const glowGradient = ctx.createRadialGradient(
             centerX, centerY, 0,
-            centerX, centerY, 40
+            centerX, centerY, 60 // Larger glow
         );
-        glowGradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
-        glowGradient.addColorStop(0.7, 'rgba(255, 255, 255, 0.2)');
+        glowGradient.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
+        glowGradient.addColorStop(0.5, 'rgba(255,255,255,0.4)');
+        glowGradient.addColorStop(0.8, 'rgba(255,255,255,0.1)');
         glowGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
         
         ctx.fillStyle = glowGradient;
         ctx.beginPath();
-        ctx.arc(centerX, centerY, 40, 0, Math.PI * 2);
+        ctx.arc(centerX, centerY, 60, 0, Math.PI * 2);
         ctx.fill();
+        
+        // Animated outline
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255,255,0,0.9)';
+        ctx.lineWidth = 7 + 3*Math.abs(Math.sin(this.pulseTimer*1.5));
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, 28*pulse, 0, Math.PI*2);
+        ctx.stroke();
+        ctx.restore();
         
         // Rotate diamond
         ctx.translate(centerX, centerY);
@@ -1541,42 +1613,56 @@ function createPlatforms(level) {
         platforms.push(new Platform(x, SCREEN_HEIGHT - 50, 200, 50));
     }
     
-    // Level-specific platforms
-    switch (level) {
-        case 1:
-            platforms.push(new Platform(300, 600, 150, 20));
-            platforms.push(new Platform(600, 500, 150, 20));
-            platforms.push(new Platform(1000, 400, 150, 20));
-            break;
-        case 2:
-            platforms.push(new Platform(200, 600, 100, 20));
-            platforms.push(new Platform(400, 550, 100, 20));
-            platforms.push(new Platform(650, 500, 100, 20));
-            platforms.push(new Platform(900, 450, 100, 20));
-            platforms.push(new Platform(1200, 400, 150, 20));
-            break;
-        case 3:
-            // Vertical level
-            for (let i = 0; i < 8; i++) {
-                platforms.push(new Platform(300 + (i % 2) * 400, 650 - i * 80, 120, 20));
-            }
-            break;
-        case 4:
-            // Complex layout
-            platforms.push(new Platform(150, 600, 100, 20));
-            platforms.push(new Platform(350, 550, 80, 20));
-            platforms.push(new Platform(500, 500, 100, 20));
-            platforms.push(new Platform(700, 450, 80, 20));
-            platforms.push(new Platform(900, 400, 100, 20));
-            platforms.push(new Platform(1100, 350, 120, 20));
-            break;
-        case 5:
-            // Ultimate challenge
-            for (let i = 0; i < 10; i++) {
-                platforms.push(new Platform(200 + i * 150, 600 - (i % 3) * 100, 100, 20));
-            }
-            break;
-    }
+    // Platform height constraints (reachable by normal jump, but allow super jump for some bonus platforms)
+    // Max vertical distance for normal jump: ~220px, but use 180px for reliability
+    const maxVertical = 180;
+    const maxHorizontal = 250; // Player can clear this horizontally with jump
+    
+    const platformLayouts = [
+        // Level 1
+        [
+            {x: 300, y: 600, w: 180},
+            {x: 600, y: 480, w: 180},
+            {x: 760, y: 430, w: 180}, // moved even closer and lower for easy jump
+            {x: 1000, y: 370, w: 180}, // adjust next for smooth progression
+        ],
+        // Level 2
+        [
+            {x: 220, y: 600, w: 140},
+            {x: 500, y: 500, w: 140},
+            {x: 800, y: 400, w: 160},
+            {x: 1200, y: 300, w: 180},
+        ],
+        // Level 3 (vertical)
+        [
+            {x: 350, y: 650, w: 120},
+            {x: 600, y: 560, w: 120},
+            {x: 350, y: 470, w: 120},
+            {x: 600, y: 380, w: 120},
+            {x: 350, y: 290, w: 120},
+            {x: 600, y: 200, w: 120},
+        ],
+        // Level 4 (zigzag)
+        [
+            {x: 200, y: 600, w: 120},
+            {x: 500, y: 520, w: 120},
+            {x: 800, y: 440, w: 120},
+            {x: 1100, y: 360, w: 120},
+            {x: 1400, y: 280, w: 120},
+        ],
+        // Level 5 (challenge)
+        [
+            {x: 220, y: 600, w: 120},
+            {x: 480, y: 520, w: 120},
+            {x: 740, y: 440, w: 120},
+            {x: 1000, y: 360, w: 120},
+            {x: 1260, y: 280, w: 120},
+            {x: 1520, y: 200, w: 120},
+        ]
+    ];
+    
+    const layout = platformLayouts[(level-1)%platformLayouts.length];
+    layout.forEach(p => platforms.push(new Platform(p.x, p.y, p.w, 22)));
 }
 
 function createRobots(level) {
@@ -1614,29 +1700,61 @@ function createRobots(level) {
 
 function createDiamonds(level) {
     const diamondCount = 15 + level * 5;
+    const allSurfaces = [];
+    // Add platforms (excluding ground)
+    platforms.forEach(p => {
+        if (p.y < SCREEN_HEIGHT - 60) {
+            allSurfaces.push(p);
+        }
+    });
+    // Add ground as a surface
+    allSurfaces.push({x: 0, y: SCREEN_HEIGHT - 70, width: WORLD_WIDTH});
     
     for (let i = 0; i < diamondCount; i++) {
-        const x = 200 + Math.random() * (WORLD_WIDTH - 400);
-        const y = 300 + Math.random() * 200;
+        // Pick a random surface
+        const surface = allSurfaces[Math.floor(Math.random() * allSurfaces.length)];
+        const pad = 18;
+        const x = surface.x + pad + Math.random() * (surface.width - 2*pad);
+        // 50% chance to float, but always within jump range (max 160px above surface)
+        let y;
+        if (Math.random() < 0.5) {
+            // On the surface
+            y = surface.y - 28;
+        } else {
+            // Floating, but within jump range
+            const maxJump = 160; // px above surface, slightly less than max jump
+            const minFloat = 40; // at least a little above
+            const floatHeight = minFloat + Math.random() * (maxJump - minFloat);
+            y = surface.y - 28 - floatHeight;
+        }
         diamonds.push(new Diamond(x, y));
     }
 }
 
 function createSuperDiamonds(level) {
-    // Create 1-3 super diamonds per level
-    const superDiamondCount = Math.min(3, Math.floor(level / 2) + 1);
+    // Always create at least 1 super diamond, up to 3
+    const superDiamondCount = Math.min(3, Math.max(1, level));
     const types = ['jump', 'strength', 'invincibility'];
     
+    console.log(`🎯 Creating ${superDiamondCount} super diamonds for level ${level}`);
+    
+    // Get visible platforms (not too low)
+    const validPlatforms = platforms.filter(p => p.y < SCREEN_HEIGHT - 150);
+    
+    if (validPlatforms.length === 0) {
+        console.warn('No valid platforms found for super diamonds!');
+        return;
+    }
+    
     for (let i = 0; i < superDiamondCount; i++) {
-        // Place super diamonds on platforms for easier access
-        const platform = platforms[Math.floor(Math.random() * Math.min(platforms.length, 10))];
-        if (platform && platform.y < SCREEN_HEIGHT - 100) {
-            const x = platform.x + Math.random() * (platform.width - 30);
-            const y = platform.y - 40;
-            const type = types[i % types.length];
-            superDiamonds.push(new SuperDiamond(x, y, type));
-            console.log(`🌟 Created ${type} super diamond at (${x.toFixed(0)}, ${y.toFixed(0)})`);
-        }
+        // Pick a random platform that's not too low
+        const platform = validPlatforms[Math.floor(Math.random() * validPlatforms.length)];
+        const x = platform.x + 10 + Math.random() * (platform.width - 50);
+        const y = platform.y - 50; // Position above platform
+        const type = types[i % types.length];
+        
+        superDiamonds.push(new SuperDiamond(x, y, type));
+        console.log(`🌟 Created ${type} super diamond at (${x.toFixed(0)}, ${y.toFixed(0)}) on platform at y=${platform.y}`);
     }
 }
 
@@ -1886,27 +2004,34 @@ function levelComplete() {
         console.log('🏆 All 5 levels completed! Game won!');
         gameWin();
     } else {
-        // Only increment level after showing the message
-        gameState.level++;
-        console.log(`🚀 Showing level complete message for Level ${gameState.level}`);
+        console.log(`🚀 Showing level complete message for current level ${gameState.level}`);
         showMessage('Level Complete!', 
-                   `Advancing to Level ${gameState.level}`, 
-                   [{ text: 'Continue', action: nextLevel }]);
+                   `Advancing to Level ${gameState.level + 1}...`, 
+                   []);
+        setTimeout(() => {
+            hideMessage();
+            nextLevel();
+        }, 2000);
     }
 }
 
 function nextLevel() {
-    hideMessage();
-    // Make sure we're not exceeding level 5
-    if (gameState.level <= 5) {
-        console.log(`🚀 Loading Level ${gameState.level}`);
-        initLevel(gameState.level);
-        updateUI(); // Update UI to show new level
-        saveGameState();
-    } else {
-        console.log('Game completed!');
+    gameState.level++;
+    if (gameState.level > 5) {
         gameWin();
+        return;
     }
+    showMessage(
+        `Level ${gameState.level}`,
+        `Get ready for Level ${gameState.level}!`,
+        [
+            { text: 'Continue', action: () => {
+                hideMessage();
+                initLevel(gameState.level);
+            }}
+        ]
+    );
+    
     console.log(`🎯 Advanced to Level ${gameState.level}`);
 }
 
@@ -2184,30 +2309,65 @@ window.resetGame = function() {
     if (confirm('Are you sure you want to restart the game? All progress will be lost.')) {
         console.log('🔄 User confirmed reset');
         
-        // Reset game state
-        gameState = { ...initialGameState };
-        console.log('🔄 Game state reset to:', gameState);
-        
-        // Reinitialize game
         try {
+            // Reset all game objects
+            player = null;
+            platforms = [];
+            robots = [];
+            diamonds = [];
+            superDiamonds = [];
+            boss = null;
+            effects = [];
+            
+            // Reset camera
+            camera = { x: 0, y: 0 };
+            
+            // Reset game state with power-ups
+            gameState = { 
+                ...initialGameState,
+                superJumpActive: false,
+                superJumpTimer: 0,
+                superStrengthActive: false,
+                superStrengthTimer: 0,
+                invincibilityActive: false,
+                invincibilityTimer: 0,
+                level: 1,
+                lives: 3,
+                score: 0,
+                diamonds: 0,
+                playerX: 100,
+                playerY: 500,
+                robotsDefeated: [],
+                diamondsCollected: [],
+                bossDefeated: false,
+                levelCompleted: false
+            };
+            
+            console.log('🔄 Game state reset to:', gameState);
+            
+            // Reinitialize game components
             initPlayer();
-            initLevel(gameState.level);
-            updateGameState();
+            initLevel(1); // Always start from level 1 on reset
             
-            // Unpause if paused
-            if (gamePaused) {
-                gamePaused = false;
-                hideMessage();
-            }
+            // Reset UI
+            updateUI();
+            hideMessage();
             
-            // Ensure game is running
+            // Reset game state flags
+            gamePaused = false;
             gameRunning = true;
             
+            // Force a redraw
+            if (lastTime) {
+                lastTime = performance.now();
+            }
+            
             console.log('🔄 Game reset successfully');
+            
         } catch (error) {
             console.error('❌ Error during game reset:', error);
             showMessage('Reset Error', 'Failed to reset the game. Please refresh the page.', [
-                { text: 'OK', action: () => hideMessage() }
+                { text: 'OK', action: () => window.location.reload() }
             ]);
         }
     } else {
@@ -2221,6 +2381,21 @@ window.saveGame = function() {
     if (!gameRunning) {
         console.log('⚠️ Cannot save - game not running');
         showMessage('Cannot Save', 'Game is not currently running.', [
+            { text: 'OK', action: () => hideMessage() }
+        ]);
+        return;
+    }
+    
+    // Get CSRF token safely
+    let csrftoken = null;
+    if (typeof getCookie === 'function') {
+        csrftoken = getCookie('csrftoken');
+    } else if (window.csrftoken) {
+        csrftoken = window.csrftoken;
+    }
+    if (!csrftoken) {
+        console.error('❌ CSRF token not found. Save aborted.');
+        showMessage('Save Error', 'CSRF token missing. Please refresh the page and try again.', [
             { text: 'OK', action: () => hideMessage() }
         ]);
         return;
@@ -2275,6 +2450,35 @@ window.saveGame = function() {
         ]);
     });
 };
+
+// Ensure the save button is always wired up
+function wireSaveButton() {
+    const saveBtn = document.getElementById('saveBtn');
+    if (saveBtn) {
+        saveBtn.onclick = window.saveGame;
+        saveBtn.disabled = !gameRunning;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', wireSaveButton);
+// Also call after game state changes
+function updateButtonStates() {
+    const pauseBtn = document.getElementById('pauseBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const saveBtn = document.getElementById('saveBtn');
+    if (pauseBtn) {
+        pauseBtn.disabled = !gameRunning;
+        pauseBtn.textContent = gamePaused ? '▶️ Resume' : '⏸️ Pause';
+    }
+    if (resetBtn) {
+        resetBtn.disabled = false;
+    }
+    if (saveBtn) {
+        saveBtn.disabled = !gameRunning;
+        saveBtn.onclick = window.saveGame;
+    }
+}
+
 
 // Manual initialization function for debugging
 window.startGame = function() {
