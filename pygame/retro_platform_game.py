@@ -679,14 +679,21 @@ class Robot:
             sound_manager.play_sound('robot_hit')
             
         # Check if jumped on
-        if (abs(self.x - player.x) < 30 and 
-            player.y + player.height < self.y + 10 and 
-            player.vel_y > 0):
+        player_rect = pygame.Rect(player.x, player.y, player.width, player.height)
+        robot_rect = pygame.Rect(self.x, self.y, self.width, self.height)
+        
+        # Check if player is above the robot and moving downward
+        if (player_rect.colliderect(robot_rect) and 
+            player_rect.bottom < robot_rect.centery and 
+            player.vel_y > 0 and 
+            player.jump_cooldown == 0):
             self.health -= 20
-            player.vel_y = -8  # Bounce player up
+            player.vel_y = -12  # Bounce player up more
             sound_manager.play_sound('robot_hit')
             # Add cooldown to prevent infinite bouncing
             player.jump_cooldown = 10
+            # Push the player up slightly to prevent getting stuck
+            player.y = self.y - player.height - 1
             
         if self.health <= 0:
             self.alive = False

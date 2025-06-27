@@ -1,17 +1,35 @@
 from django.urls import path
+from django.views.decorators.cache import cache_page
+from django.views.decorators.http import require_http_methods
 from . import views
 
 app_name = 'retro_platform_fighter'
 
 urlpatterns = [
-    path('', views.index, name='index'),
-    path('play/', views.game_view, name='game'),
+    # Game pages
+    path('', views.IndexView.as_view(), name='index'),
+    path('play/', views.GameView.as_view(), name='game'),
     path('leaderboard/', views.leaderboard, name='leaderboard'),
     
-    # API endpoints
-    path('api/save-state/', views.save_game_state, name='save_state'),
-    path('api/load-state/', views.load_game_state, name='load_state'),
-    path('api/submit-score/', views.submit_high_score, name='submit_score'),
-    path('api/high-scores/', views.high_scores, name='high_scores'),
-    path('api/reset-game/', views.reset_game, name='reset_game'),
+    # API endpoints - using class-based views with appropriate HTTP methods
+    path('api/save-state/', 
+         views.SaveGameStateView.as_view(), 
+         name='save_state'
+    ),
+    path('api/load-state/', 
+         require_http_methods(['GET'])(views.load_game_state), 
+         name='load_state'
+    ),
+    path('api/submit-score/', 
+         views.SubmitHighScoreView.as_view(), 
+         name='submit_score'
+    ),
+    path('api/high-scores/', 
+         cache_page(60 * 5)(require_http_methods(['GET'])(views.high_scores)), 
+         name='high_scores'
+    ),
+    path('api/reset-game/', 
+         require_http_methods(['POST'])(views.reset_game), 
+         name='reset_game'
+    ),
 ]

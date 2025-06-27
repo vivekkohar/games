@@ -466,12 +466,18 @@ class Player {
     }
     
     isOnTopOf(target) {
-        // Check if player is landing on top of target
-        return (this.x < target.x + target.width &&
-                this.x + this.width > target.x &&
-                this.y + this.height >= target.y &&
-                this.y + this.height <= target.y + 20 && // Small tolerance
-                this.velY > 0); // Player must be falling
+        // Check if player is landing on top of target with better collision detection
+        const playerBottom = this.y + this.height;
+        const targetTop = target.y;
+        const playerMiddleX = this.x + this.width / 2;
+        
+        return (
+            playerBottom >= targetTop - 5 && // Slightly above the top
+            playerBottom <= targetTop + 20 && // Small tolerance
+            playerMiddleX > target.x && // Within target's width
+            playerMiddleX < target.x + target.width &&
+            this.velY > 0 // Player must be falling
+        );
     }
     
     handleInput() {
@@ -1126,7 +1132,14 @@ class Boss {
     }
     
     takeDamage(amount) {
+        if (this.defeated) return;
+        
+        console.log(`Boss took ${amount} damage! Health: ${this.health} -> ${this.health - amount}`);
         this.health -= amount;
+        
+        // Visual feedback
+        createHitEffect(this.x + this.width/2, this.y - 30);
+        
         if (this.health <= 0) {
             this.defeated = true;
             gameState.score += 500;
@@ -1134,20 +1147,34 @@ class Boss {
             updateUI();
             createExplosionEffect(this.x, this.y);
             levelComplete();
+        } else {
+            // Flash effect when hit
+            this.flashTimer = 5;
+            playSound('bossHit');
         }
     }
     
     draw() {
         if (this.defeated) return;
         
+        // Flash effect when hit
+        if (this.flashTimer > 0) {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            ctx.fillRect(this.x - camera.x - 5, this.y - camera.y - 5, this.width + 10, this.height + 10);
+            this.flashTimer--;
+        }
+        
         // Draw boss body (larger robot)
         ctx.fillStyle = '#333333';
         ctx.fillRect(this.x - camera.x, this.y - camera.y, this.width, this.height);
         
-        // Draw glowing eyes
-        ctx.fillStyle = COLORS.RED;
-        ctx.fillRect(this.x - camera.x + 10, this.y - camera.y + 10, 8, 8);
-        ctx.fillRect(this.x - camera.x + 32, this.y - camera.y + 10, 8, 8);
+        // Draw glowing eyes with pulsing effect
+        const pulse = 1 + 0.2 * Math.sin(Date.now() * 0.01);
+        const eyeSize = 8 * (this.health < this.maxHealth * 0.3 ? 1.5 : 1); // Bigger when low health
+        
+        ctx.fillStyle = `hsl(${Date.now() * 0.1 % 360}, 100%, 60%)`; // Rainbow effect
+        ctx.fillRect(this.x - camera.x + 10, this.y - camera.y + 10, eyeSize, eyeSize);
+        ctx.fillRect(this.x - camera.x + 32, this.y - camera.y + 10, eyeSize, eyeSize);
         
         // Draw health bar
         const barWidth = 60;
@@ -1197,11 +1224,21 @@ class SuperDiamond {
         this.sparkleTimer++;
         this.pulseTimer += 0.15;
         
-        // Check collision with player
-        if (this.x < player.x + player.width &&
-            this.x + this.width > player.x &&
-            this.y < player.y + player.height &&
-            this.y + this.height > player.y) {
+        // Calculate screen position with camera offset
+        const screenX = this.x - camera.x;
+        const screenY = this.y - camera.y;
+        
+        // Check if on screen
+        if (screenX + this.width < 0 || screenX > SCREEN_WIDTH ||
+            screenY + this.height < 0 || screenY > SCREEN_HEIGHT) {
+            return; // Skip collision check if not on screen
+        }
+        
+        // Check collision with player (using screen coordinates)
+        if (screenX < player.x + player.width &&
+            screenX + this.width > player.x &&
+            screenY < player.y + player.height &&
+            screenY + this.height > player.y) {
             
             this.collected = true;
             this.activatePowerUp();
@@ -1209,6 +1246,9 @@ class SuperDiamond {
             playSound('diamondCollect');
             updateUI();
             createSparkleEffect(this.x, this.y);
+            
+            // Log collection for debugging
+            console.log(`✨ Collected ${this.type} super diamond!`);
         }
     }
     
@@ -1244,10 +1284,24 @@ class SuperDiamond {
         
         ctx.save();
         
-        // Pulsing effect
-        const pulse = 1 + 0.2 * Math.sin(this.pulseTimer);
+        // Enhanced pulsing effect
+        const pulse = 1 + 0.3 * Math.sin(this.pulseTimer);
         const centerX = this.x - camera.x + this.width/2;
         const centerY = this.y - camera.y + this.height/2;
+        
+        // Draw outer glow
+        const glowGradient = ctx.createRadialGradient(
+            centerX, centerY, 0,
+            centerX, centerY, 40
+        );
+        glowGradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+        glowGradient.addColorStop(0.7, 'rgba(255, 255, 255, 0.2)');
+        glowGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        
+        ctx.fillStyle = glowGradient;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, 40, 0, Math.PI * 2);
+        ctx.fill();
         
         // Rotate diamond
         ctx.translate(centerX, centerY);
@@ -1826,13 +1880,14 @@ function checkLevelCompletion() {
 }
 
 function levelComplete() {
-    console.log(`🎉 Level ${gameState.level} complete! Advancing to next level...`);
-    gameState.level++;
+    console.log(`🎉 Level ${gameState.level} complete!`);
     
-    if (gameState.level > 5) {
+    if (gameState.level >= 5) {
         console.log('🏆 All 5 levels completed! Game won!');
         gameWin();
     } else {
+        // Only increment level after showing the message
+        gameState.level++;
         console.log(`🚀 Showing level complete message for Level ${gameState.level}`);
         showMessage('Level Complete!', 
                    `Advancing to Level ${gameState.level}`, 
@@ -1842,9 +1897,16 @@ function levelComplete() {
 
 function nextLevel() {
     hideMessage();
-    initLevel(gameState.level);
-    updateUI(); // Update UI to show new level
-    saveGameState();
+    // Make sure we're not exceeding level 5
+    if (gameState.level <= 5) {
+        console.log(`🚀 Loading Level ${gameState.level}`);
+        initLevel(gameState.level);
+        updateUI(); // Update UI to show new level
+        saveGameState();
+    } else {
+        console.log('Game completed!');
+        gameWin();
+    }
     console.log(`🎯 Advanced to Level ${gameState.level}`);
 }
 
@@ -1949,9 +2011,31 @@ function saveGameState() {
     .catch(error => console.error('Auto-save error:', error));
 }
 
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
 function submitHighScore() {
     const playerName = prompt('Enter your name for the leaderboard:', 'Anonymous');
     if (!playerName) return;
+    
+    const csrftoken = getCookie('csrftoken');
+    if (!csrftoken) {
+        console.error('CSRF token not found');
+        showMessage('Error', 'Security token missing. Please refresh the page and try again.');
+        return;
+    }
     
     const data = {
         player_name: playerName,
@@ -1959,12 +2043,16 @@ function submitHighScore() {
         level_reached: gameState.level
     };
     
+    console.log('Submitting score:', data);
+    
     fetch('/retro_platform_fighter/api/submit-score/', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'X-CSRFToken': csrftoken
+            'X-CSRFToken': csrftoken,
+            'X-Requested-With': 'XMLHttpRequest'
         },
+        credentials: 'same-origin',
         body: JSON.stringify(data)
     })
     .then(response => response.json())
