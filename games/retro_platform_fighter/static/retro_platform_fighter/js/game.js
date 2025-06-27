@@ -1462,6 +1462,8 @@ function createProjectileEffect(fromX, fromY, toX, toY) {
 
 // Level initialization
 function initLevel(levelNum) {
+    console.log(`🏗️ Initializing Level ${levelNum}...`);
+    
     platforms = [];
     robots = [];
     diamonds = [];
@@ -1475,6 +1477,8 @@ function initLevel(levelNum) {
     createDiamonds(levelNum);
     createSuperDiamonds(levelNum); // Create super diamonds
     createBoss(levelNum);
+    
+    console.log(`✅ Level ${levelNum} initialized with ${robots.length} robots, ${diamonds.length} diamonds, ${superDiamonds.length} super diamonds`);
 }
 
 function createPlatforms(level) {
@@ -1810,17 +1814,26 @@ function checkLevelCompletion() {
     const allRobotsDefeated = robots.every(robot => robot.defeated);
     const bossDefeated = boss ? boss.defeated : true;
     
+    // Debug logging
+    const robotsLeft = robots.filter(robot => !robot.defeated).length;
+    if (robotsLeft === 0 && bossDefeated) {
+        console.log(`🏆 Level ${gameState.level} completed! All robots defeated: ${allRobotsDefeated}, Boss defeated: ${bossDefeated}`);
+    }
+    
     if (allRobotsDefeated && bossDefeated) {
         levelComplete();
     }
 }
 
 function levelComplete() {
+    console.log(`🎉 Level ${gameState.level} complete! Advancing to next level...`);
     gameState.level++;
     
     if (gameState.level > 5) {
+        console.log('🏆 All 5 levels completed! Game won!');
         gameWin();
     } else {
+        console.log(`🚀 Showing level complete message for Level ${gameState.level}`);
         showMessage('Level Complete!', 
                    `Advancing to Level ${gameState.level}`, 
                    [{ text: 'Continue', action: nextLevel }]);
@@ -1830,7 +1843,9 @@ function levelComplete() {
 function nextLevel() {
     hideMessage();
     initLevel(gameState.level);
+    updateUI(); // Update UI to show new level
     saveGameState();
+    console.log(`🎯 Advanced to Level ${gameState.level}`);
 }
 
 function gameWin() {
@@ -1990,20 +2005,31 @@ function resetGame() {
         }
     })
     .then(() => {
-        // Reset game state
+        console.log('🔄 Resetting game to Level 1...');
+        
+        // Reset game state with power-ups
         gameState = {
             level: 1,
             diamonds: 50,
             lives: 3,
             score: 0,
             playerX: 100,
-            playerY: 500
+            playerY: 500,
+            // Power-up states
+            superJumpActive: false,
+            superJumpTimer: 0,
+            superStrengthActive: false,
+            superStrengthTimer: 0,
+            invincibilityActive: false,
+            invincibilityTimer: 0
         };
         
         updateGameState();
         initLevel(1);
         gameRunning = true;
         gamePaused = false;
+        
+        console.log('✅ Game reset complete');
     })
     .catch(error => console.error('Reset error:', error));
 }

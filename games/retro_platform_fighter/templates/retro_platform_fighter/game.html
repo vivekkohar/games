@@ -160,12 +160,46 @@ function testAPI() {
     });
 }
 
-// Make testAPI available globally for debugging
+// Debug function to test level progression
+function testLevelProgression() {
+    console.log('🎯 Testing level progression...');
+    console.log(`Current level: ${gameState.level}`);
+    console.log(`Robots remaining: ${robots.filter(r => !r.defeated).length}`);
+    console.log(`Boss defeated: ${boss ? boss.defeated : 'No boss'}`);
+    
+    // Force complete current level for testing
+    robots.forEach(robot => robot.defeated = true);
+    if (boss) boss.defeated = true;
+    
+    console.log('🏆 Forcing level completion...');
+    checkLevelCompletion();
+}
+
+// Debug function to skip to specific level
+function skipToLevel(level) {
+    if (level < 1 || level > 5) {
+        console.error('❌ Invalid level. Must be 1-5');
+        return;
+    }
+    
+    console.log(`🚀 Skipping to Level ${level}...`);
+    gameState.level = level;
+    initLevel(level);
+    updateUI();
+    console.log(`✅ Now on Level ${level}`);
+}
+
+// Make debug functions available globally
 window.testAPI = testAPI;
+window.testLevelProgression = testLevelProgression;
+window.skipToLevel = skipToLevel;
 
 console.log('🎮 Game page loaded, initial state:', initialGameState);
 console.log('🔑 CSRF Token:', csrftoken);
-console.log('🧪 Run testAPI() in console to test API endpoints');
+console.log('🧪 Debug functions available:');
+console.log('   - testAPI() - Test API endpoints');
+console.log('   - testLevelProgression() - Force complete current level');
+console.log('   - skipToLevel(1-5) - Skip to specific level');
 
 // Test button functionality
 document.addEventListener('DOMContentLoaded', function() {
