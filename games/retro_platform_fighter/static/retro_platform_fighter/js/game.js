@@ -353,9 +353,6 @@ class Player {
         // Apply gravity based on power-up state
         GRAVITY = gameState.superJumpActive ? SUPER_JUMP_GRAVITY : NORMAL_GRAVITY;
         
-        // Track if player was in air (for jump attacks)
-        this.wasInAir = !this.onGround;
-        
         // Apply gravity
         this.velY += GRAVITY;
         
@@ -363,13 +360,13 @@ class Player {
         this.x += this.velX;
         this.y += this.velY;
         
-        // Check platform collisions
-        this.checkPlatformCollisions();
-        
-        // Check jump attacks on robots - check every frame while in air
-        if (this.wasInAir && this.jumpAttackCooldown <= 0) {
+        // Check jump attacks on robots and boss before platform collision
+        if (this.jumpAttackCooldown <= 0) {
             this.checkJumpAttacks();
         }
+        
+        // Check platform collisions
+        this.checkPlatformCollisions();
         
         // Update jump attack cooldown
         if (this.jumpAttackCooldown > 0) {
@@ -468,48 +465,32 @@ class Player {
     
     checkJumpAttacks() {
         // First check robots
-        let foundAttack = false;
         for (let i = 0; i < robots.length; i++) {
             const robot = robots[i];
             if (!robot.defeated && this.isOnTopOf(robot)) {
-                foundAttack = true;
-                console.log(`🦘 Attempting jump attack on robot at (${robot.x},${robot.y})`);
-                // Enhanced jump attack damage with super strength
-                const baseJumpDamage = JUMP_DAMAGE * (gameState.superStrengthActive ? 3 : 1);
-                const damage = baseJumpDamage + (this.velY > 0 ? Math.abs(this.velY) * 2 : 0); // Bonus for falling speed
-
-                // Apply damage
-                robot.takeDamage(damage);
-                console.log(`🤖 Robot HP after jump: ${robot.health}`);
-
-                // Bounce effect - stronger if falling fast
-                const bounceStrength = Math.min(Math.abs(this.velY) * 0.8, 15);
-                this.velY = -bounceStrength;
-                this.jumpAttackCooldown = 15; // Shorter cooldown for faster gameplay
-
-                // Visual and audio feedback
+                console.log(`🦘 Jump attack on robot at (${robot.x},${robot.y}) - INSTANT KILL`);
+                // Instantly kill the robot
+                robot.health = 0;
+                robot.takeDamage(0); // This will set defeated and trigger effects
+                // Place player on top of robot and stop downward velocity
+                this.y = robot.y - this.height;
+                this.velY = 0;
+                this.onGround = true;
+                this.jumpAttackCooldown = 15;
                 createHitEffect(robot.x + robot.width/2, robot.y - 10);
                 playSound('explosion');
-
-                console.log(`🦘 Jump attack! Damage: ${damage} (velY: ${this.velY.toFixed(1)})`);
-
-                // Only process one robot per frame to avoid multiple bounces
                 break;
             }
         }
-
         // Then check boss
         if (boss && !boss.defeated && this.isOnTopOf(boss)) {
             const baseJumpDamage = JUMP_DAMAGE * 1.5 * (gameState.superStrengthActive ? 3 : 1);
             const damage = baseJumpDamage + (this.velY > 0 ? Math.abs(this.velY) * 2 : 0);
-
             boss.takeDamage(damage);
-
             // Bounce higher off boss
             const bounceStrength = Math.min(Math.abs(this.velY) * 0.9, 18);
             this.velY = -bounceStrength;
             this.jumpAttackCooldown = 20;
-
             createHitEffect(boss.x + boss.width/2, boss.y - 20);
             playSound('explosion');
             console.log(`🦘 Jump attack on boss! Damage: ${damage} (velY: ${this.velY.toFixed(1)})`);
@@ -590,17 +571,7 @@ class Player {
         
         if (hitCount === 0) {
             console.log('❌ Attack missed - no targets in range');
-        // Check if target is in front of player (more lenient)
-        const inFront = (this.facing === 1 && dx > -10) || (this.facing === -1 && dx < 10);
-        
-        // Check vertical alignment (more lenient)
-        const verticallyAligned = Math.abs(dy) < 40;
-        
-        const inRange = distance <= range;
-        
-        console.log(`🎯 Attack check: distance=${distance.toFixed(1)}, range=${range}, inFront=${inFront}, verticallyAligned=${verticallyAligned}`);
-        
-        return inRange && inFront && verticallyAligned;
+        }
     }
     
     checkPlatformCollisions() {
@@ -637,6 +608,26 @@ class Player {
             this.y = SCREEN_HEIGHT - 50 - this.height;
             this.velY = 0;
             this.onGround = true;
+        }
+
+        // After platform collision checks, treat robots as platforms
+        for (let i = 0; i < robots.length; i++) {
+            const robot = robots[i];
+            if (!robot.defeated) {
+                // Check if player is landing on top of robot
+                const playerBottom = this.y + this.height;
+                const prevBottom = this.y + this.height - this.velY; // previous frame's bottom
+                const robotTop = robot.y;
+                const robotLeft = robot.x;
+                const robotRight = robot.x + robot.width;
+                const horizontalOverlap = this.x + this.width > robotLeft + 4 && this.x < robotRight - 4;
+                // Only land if falling and crossing the robot's top
+                if (this.velY > 0 && prevBottom <= robotTop && playerBottom >= robotTop && horizontalOverlap) {
+                    this.y = robotTop - this.height;
+                    this.velY = 0;
+                    this.onGround = true;
+                }
+            }
         }
     }
     
@@ -871,17 +862,14 @@ class Player {
     isOnTopOf(target) {
         // Check if player is falling
         if (this.velY <= 0) return false;
-        // Calculate player and target bounds
         const playerBottom = this.y + this.height;
-        const playerTop = this.y;
         const targetTop = target.y;
-        const targetBottom = target.y + target.height;
         const targetLeft = target.x;
         const targetRight = target.x + target.width;
-        // Check horizontal overlap
-        const horizontalOverlap = this.x + this.width > targetLeft + 8 && this.x < targetRight - 8;
-        // Check if player's bottom is above the top half of the target and within a small margin
-        const verticalCondition = playerBottom > targetTop && playerTop < targetTop && playerBottom < targetTop + target.height * 0.6;
+        // Horizontal overlap
+        const horizontalOverlap = this.x + this.width > targetLeft + 4 && this.x < targetRight - 4;
+        // Player's bottom is within 0-12px above target's top
+        const verticalCondition = playerBottom > targetTop && playerBottom < targetTop + 12;
         return horizontalOverlap && verticalCondition;
     }
 }
@@ -983,9 +971,12 @@ class Robot {
             this.y < player.y + player.height &&
             this.y + this.height > player.y;
         if (collidesWithPlayer && this.attackCooldown <= 0) {
-            player.takeDamage(5);
-            this.attackCooldown = 60; // 1 second cooldown
-            playSound('robotHit');
+            // Only damage player if player is NOT on top (not performing a jump attack)
+            if (!player.isOnTopOf(this)) {
+                player.takeDamage(5);
+                this.attackCooldown = 60; // 1 second cooldown
+                playSound('robotHit');
+            }
         }
 
         if (this.attackCooldown > 0) {
@@ -1208,7 +1199,7 @@ class Boss {
             playSound('explosion');
             updateUI();
             createExplosionEffect(this.x, this.y);
-            levelComplete();
+            levelComplete(); // Always advance level when boss is defeated
         } else {
             // Flash effect when hit
             this.flashTimer = 5;
@@ -1262,14 +1253,13 @@ class SuperDiamond {
     constructor(x, y, type = 'jump') {
         this.x = x;
         this.y = y;
-        this.width = 50; // Increased size
-        this.height = 50; // Increased size
+        this.width = 70; // Bigger size
+        this.height = 70; // Bigger size
         this.collected = false;
         this.animationFrame = 0;
         this.sparkleTimer = 0;
         this.type = type; // 'jump', 'strength', 'invincibility'
         this.pulseTimer = 0;
-        
         // Type-specific properties
         this.colors = {
             jump: { primary: COLORS.BLUE, secondary: COLORS.CYAN },
@@ -1343,98 +1333,122 @@ class SuperDiamond {
     
     draw() {
         if (this.collected) return;
-        
         ctx.save();
-        
         // Enhanced pulsing effect
-        const pulse = 1.2 + 0.5 * Math.sin(this.pulseTimer); // More dramatic pulse
+        const pulse = 1.3 + 0.7 * Math.sin(this.pulseTimer); // Even more dramatic pulse
         const centerX = this.x - camera.x + this.width/2;
         const centerY = this.y - camera.y + this.height/2;
-        
         // Draw outer glow
         const glowGradient = ctx.createRadialGradient(
             centerX, centerY, 0,
-            centerX, centerY, 60 // Larger glow
+            centerX, centerY, 80 // Larger glow
         );
-        glowGradient.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
-        glowGradient.addColorStop(0.5, 'rgba(255,255,255,0.4)');
-        glowGradient.addColorStop(0.8, 'rgba(255,255,255,0.1)');
-        glowGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-        
+        const colors = this.colors[this.type];
+        glowGradient.addColorStop(0, colors.secondary + 'CC');
+        glowGradient.addColorStop(0.4, colors.secondary + '66');
+        glowGradient.addColorStop(0.7, colors.primary + '33');
+        glowGradient.addColorStop(1, 'rgba(255,255,255,0)');
         ctx.fillStyle = glowGradient;
         ctx.beginPath();
-        ctx.arc(centerX, centerY, 60, 0, Math.PI * 2);
+        ctx.arc(centerX, centerY, 80, 0, Math.PI * 2);
         ctx.fill();
-        
         // Animated outline
         ctx.save();
-        ctx.strokeStyle = 'rgba(255,255,0,0.9)';
-        ctx.lineWidth = 7 + 3*Math.abs(Math.sin(this.pulseTimer*1.5));
+        ctx.strokeStyle = colors.secondary;
+        ctx.lineWidth = 10 + 4*Math.abs(Math.sin(this.pulseTimer*1.5));
         ctx.beginPath();
-        ctx.arc(centerX, centerY, 28*pulse, 0, Math.PI*2);
+        ctx.arc(centerX, centerY, 36*pulse, 0, Math.PI*2);
         ctx.stroke();
         ctx.restore();
-        
         // Rotate diamond
         ctx.translate(centerX, centerY);
         ctx.rotate(this.animationFrame);
         ctx.scale(pulse, pulse);
-        
-        // Draw outer glow
-        const colors = this.colors[this.type];
-        ctx.shadowColor = colors.secondary;
-        ctx.shadowBlur = 20;
-        
         // Draw super diamond (larger than regular)
+        ctx.shadowColor = colors.secondary;
+        ctx.shadowBlur = 30;
         ctx.fillStyle = colors.primary;
         ctx.beginPath();
-        ctx.moveTo(0, -15);
-        ctx.lineTo(12, 0);
-        ctx.lineTo(0, 15);
-        ctx.lineTo(-12, 0);
+        ctx.moveTo(0, -22);
+        ctx.lineTo(18, 0);
+        ctx.lineTo(0, 22);
+        ctx.lineTo(-18, 0);
         ctx.closePath();
         ctx.fill();
-        
         // Draw inner highlight
         ctx.fillStyle = colors.secondary;
         ctx.beginPath();
-        ctx.moveTo(0, -10);
-        ctx.lineTo(8, 0);
-        ctx.lineTo(0, 10);
-        ctx.lineTo(-8, 0);
+        ctx.moveTo(0, -14);
+        ctx.lineTo(11, 0);
+        ctx.lineTo(0, 14);
+        ctx.lineTo(-11, 0);
         ctx.closePath();
         ctx.fill();
-        
         // Draw outline
         ctx.strokeStyle = COLORS.WHITE;
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 4;
         ctx.shadowBlur = 0;
         ctx.beginPath();
-        ctx.moveTo(0, -15);
-        ctx.lineTo(12, 0);
-        ctx.lineTo(0, 15);
-        ctx.lineTo(-12, 0);
+        ctx.moveTo(0, -22);
+        ctx.lineTo(18, 0);
+        ctx.lineTo(0, 22);
+        ctx.lineTo(-18, 0);
         ctx.closePath();
         ctx.stroke();
-        
+        // Draw unique icon for each type
+        ctx.shadowBlur = 0;
+        if (this.type === 'jump') {
+            // Upward arrow
+            ctx.strokeStyle = COLORS.CYAN;
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(0, 8);
+            ctx.lineTo(0, -10);
+            ctx.moveTo(-6, -2);
+            ctx.lineTo(0, -10);
+            ctx.lineTo(6, -2);
+            ctx.stroke();
+        } else if (this.type === 'strength') {
+            // Dumbbell
+            ctx.strokeStyle = COLORS.ORANGE;
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(-10, 0);
+            ctx.lineTo(10, 0);
+            ctx.moveTo(-13, -4);
+            ctx.lineTo(-13, 4);
+            ctx.moveTo(13, -4);
+            ctx.lineTo(13, 4);
+            ctx.stroke();
+        } else if (this.type === 'invincibility') {
+            // Shield
+            ctx.strokeStyle = COLORS.GOLD;
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(0, -8);
+            ctx.lineTo(7, 0);
+            ctx.lineTo(0, 12);
+            ctx.lineTo(-7, 0);
+            ctx.closePath();
+            ctx.stroke();
+        }
         ctx.restore();
-        
         // Enhanced sparkle effect
         if (this.sparkleTimer % 20 < 10) {
             const sparkles = [
-                { x: this.x - camera.x + 5, y: this.y - camera.y - 8 },
-                { x: this.x - camera.x + 25, y: this.y - camera.y + 8 },
-                { x: this.x - camera.x - 5, y: this.y - camera.y + 25 },
-                { x: this.x - camera.x + 20, y: this.y - camera.y - 5 }
+                { x: this.x - camera.x + 10, y: this.y - camera.y - 12 },
+                { x: this.x - camera.x + 40, y: this.y - camera.y + 12 },
+                { x: this.x - camera.x - 10, y: this.y - camera.y + 40 },
+                { x: this.x - camera.x + 35, y: this.y - camera.y - 10 }
             ];
-            
             ctx.fillStyle = COLORS.WHITE;
             sparkles.forEach(sparkle => {
-                ctx.fillRect(sparkle.x, sparkle.y, 3, 3);
+                ctx.fillRect(sparkle.x, sparkle.y, 4, 4);
             });
         }
     }
 }
+
 class Diamond {
     constructor(x, y) {
         this.x = x;
